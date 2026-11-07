@@ -45,6 +45,8 @@ Antes, o controle era feito direto na planilha, sem uma visão clara de **qual c
 | 🗓️ | **Calendário** | Visão semanal e mensal por galpão, com as **cargas conjugadas** destacadas |
 | 📈 | **Indicadores** | % no prazo do cronograma, % entregue na agenda e tempo médio por etapa |
 | 🔎 | **Filtros e busca** | Por galpão, loja destino, status, carga ou envio |
+| 📥 | **Importação do WMS** | Lê o relatório de cargas do Infor WMS, cria as cargas novas e avança o status sozinho (ex.: expedida) |
+| 🗓️ | **Agendar em lote** | Informa o envio e a data de agenda do portal ML para várias cargas de uma vez |
 | ✅ | **Conferência da base** | Ao carregar a planilha, mostra problemas e o que vai mudar antes de gravar |
 | 📤 | **Exportação para Excel** | Cargas selecionadas ou a base completa, com histórico e regras |
 | 💬 | **Resumo do dia** | Texto pronto para colar no Teams ou WhatsApp |
@@ -118,10 +120,12 @@ Depois de instalado, o painel abre como um aplicativo e **funciona sem internet*
 
 ## 🚀 Como usar
 
-1. Abra o painel e clique em **Carregar base**
-2. Escolha a planilha (`.xlsx`), confira o resumo e clique em **Confirmar importação**
-3. Acompanhe as cargas e mude o status clicando no número da carga
+1. Extraia o relatório de cargas do **WMS** e clique em **Carregar base**: o painel reconhece o arquivo, mostra o que vai mudar e você confirma
+2. Depois de agendar no **portal do Mercado Livre**, marque as cargas e use **Agendar** para informar o envio e a data de agenda
+3. Acompanhe as cargas; o WMS avança o status sozinho, e o que não vem dele você muda clicando no número da carga
 4. Clique em **Baixar base** e salve a planilha na pasta da equipe
+
+> 📥 Do relatório do WMS, o painel usa só o necessário: nº da ordem (carga), data da ordem (roteirização), galpão, receptor (loja destino), estimativa de paletes, status e data real de expedição.
 
 ---
 
@@ -136,7 +140,7 @@ Depois de instalado, o painel abre como um aplicativo e **funciona sem internet*
 | `DATA ROTEIRIZAÇÃO` | Data em que a carga foi criada |
 | `DATA AGENDA` | Data de entrega no Mercado Livre |
 | `STATUS` | Aguardando cronograma · Próxima a produzir · Em produção · Produzida · Expedida · Entregue · Cancelada |
-| `VOLUME` | Opcional |
+| `PALETES` | Estimativa de paletes (vem do WMS) |
 | `OBSERVAÇÃO` | Livre |
 
 As colunas **Data Cronograma** e **Data Informar R.F.** são calculadas pela própria planilha, a partir das células de regra.

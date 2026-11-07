@@ -339,7 +339,7 @@ let docs=new Map(), meta=null, loaded=false, slow=false, loadErr="";
 let lojaF="", sel=new Set(), filtro="abertas", galpaoF="", busca="", toast="", toastErr=false;
 let openId=null, dForm=null, dConfirmDel=false, dSaving=false, dMsg="";
 let imp=null; // prévia de importação
-let bulkSt="2", bulkData="", bulkBusy=false;
+let bulkSt="2", bulkData="", bulkBusy=false, bulkEnvio="", bulkAgenda="";
 let calStart=null, calModo="cron", calMes=null, calVista="semana"; try{calVista=localStorage.getItem("painel-cal-vista")==="mes"?"mes":"semana";}catch(e){}
 let kpiMes="";
 let cfgOpen=false, cfgDraft=null, salvandoRegra=false;
@@ -414,7 +414,7 @@ function calc(id,d,hoje){
   const duAg=ag==null?null:uteisEntre(hoje,ag);
   let alerta="No prazo",nivel="ok",acao="";
   if(cod===6||cod===0){alerta="Encerrada";nivel="none";}
-  else if(ag==null){alerta="Sem agenda";nivel="high";acao="Informar data de agenda";}
+  else if(ag==null){alerta="Sem agenda";nivel="high";acao="Agendar no portal ML";}
   else if(hoje>ag){alerta="Entrega atrasada";nivel="crit";acao="Cobrar entrega / reagendar";}
   else if(cod===1){
     acao="Incluir no cronograma";
@@ -526,23 +526,25 @@ const cgBtn=(r)=>`<button class="cg" data-open="${esc(r.id)}" title="Abrir carga
 function vPainel(){
   const ab=rows.filter(aberta);
   const prodRows=rows.filter(r=>r.cod>=1&&r.cod<=3);
-  const first=prodRows[0];
+  const first=prodRows.find(r=>r.agenda);
   const grupo=first?prodRows.filter(r=>r.agenda===first.agenda):[];
+  const semAgenda=rows.filter(r=>aberta(r)&&!r.agenda);
   const hc=first?(first.nivel==="ok"?"--accent":AL[first.nivel]):"--ok";
   const hero=first?`<div class="hero" style="--hc:var(${hc})">
       <div class="hh"><span class="label">Próxima${grupo.length>1?"s":""} carga${grupo.length>1?"s":""} para produção</span>
       <span class="d">Informar R.F. ${br(first.rf)} (${wdS(first.rf)}) · Cronograma até ${br(first.lim)} (${wdS(first.lim)}) · Agenda ${br(first.agenda)} (${wdS(first.agenda)}) · ${pl(grupo.length,"carga")}${sumVol(grupo)}</span></div>
       <div class="hbox"><table class="ht"><thead><tr><th></th><th>Carga</th><th>Envio</th><th>Galpão</th><th>Loja</th><th>Status</th><th>Informar R.F.</th><th>Cronograma até</th><th>Agenda ML</th></tr></thead><tbody>
-      ${grupo.map(r=>`<tr><td style="width:16px">${ckb(r.id)}</td><td class="big">${cgBtn(r)}</td><td class="mono">${esc(r.envio)}</td><td>${esc(r.galpao)||"—"}</td><td>${esc(r.loja)||"—"}</td><td>${ST[r.cod].nome}</td><td class="mono">${br(r.rf)}${r.cod===1?" · "+prazoTxt(r.duRf):""}</td><td class="mono">${br(r.lim)} · ${prazoTxt(r.duLim)}</td><td class="mono">${br(r.agenda)} · ${prazoTxt(r.duAg)}</td></tr>`).join("")}
+      ${grupo.map(r=>`<tr><td style="width:16px">${ckb(r.id)}</td><td class="big">${cgBtn(r)}</td><td class="mono">${esc(r.envio)||"—"}</td><td>${esc(r.galpao)||"—"}</td><td>${esc(r.loja)||"—"}</td><td>${ST[r.cod].nome}</td><td class="mono">${br(r.rf)}${r.cod===1?" · "+prazoTxt(r.duRf):""}</td><td class="mono">${br(r.lim)} · ${prazoTxt(r.duLim)}</td><td class="mono">${br(r.agenda)} · ${prazoTxt(r.duAg)}</td></tr>`).join("")}
       </tbody></table></div></div>`
-    :`<div class="hero" style="--hc:var(--ok)"><div class="hh"><span class="label">Próxima carga para produção</span><span class="d">Nenhuma carga pendente de produção.</span></div></div>`;
+    :`<div class="hero" style="--hc:var(--ok)"><div class="hh"><span class="label">Próxima carga para produção</span><span class="d">${semAgenda.length?"Nenhuma carga agendada pendente de produção.":"Nenhuma carga pendente de produção."}</span></div></div>`;
+  const avisoAgenda=semAgenda.length?`<div class="hero" style="--hc:var(--high)"><div class="hh"><span class="label">Aguardando envio e agenda</span><span class="d">${pl(semAgenda.length,"carga roteirizada","cargas roteirizadas")} sem envio e data de agenda${sumVol(semAgenda)}</span></div><span class="small" style="color:var(--band-muted)">Depois de agendar no portal do Mercado Livre, marque as cargas e use <b>Agendar</b> na barra de baixo, ou abra a carga. Assim o painel calcula o cronograma e o R.F.</span></div>`:"";
   const MAX=8;
   const prodCols=[1,2,3].map(c=>{
     const list=rows.filter(r=>r.cod===c);
     const cards=list.slice(0,MAX).map(r=>`<div class="card ${sel.has(r.id)?"on":""}" style="${av(r)}">
         <div class="r1"><label class="ck">${ckb(r.id)}</label><span style="flex:1;min-width:0">${cgBtn(r)}</span><span class="tag ${r.nivel==="ok"?"soft":""}">${r.alerta}</span></div>
-        <div class="env">Envio ${esc(r.envio)}${r.galpao?" · Galpão "+esc(r.galpao):""}${r.loja?" · Loja "+esc(r.loja):""}${r.volume!=null?" · Vol. "+fmtN(r.volume):""}${r.obs?" · "+esc(r.obs):""}</div>
-        <div class="r2">${c===1?`<span><span class="k">Informar R.F.</span> <b>${br(r.rf)}</b> ${wdS(r.rf)} · ${prazoTxt(r.duRf)}</span><span><span class="k">Cronograma até</span> <b>${br(r.lim)}</b> ${wdS(r.lim)} · ${prazoTxt(r.duLim)}</span>`:""}<span><span class="k">Agenda</span> <b>${br(r.agenda)}</b> ${wdS(r.agenda)}${c!==1?" · "+prazoTxt(r.duAg):""}</span></div>
+        <div class="env">${r.envio?"Envio "+esc(r.envio):"Sem envio"}${r.galpao?" · Galpão "+esc(r.galpao):""}${r.loja?" · Loja "+esc(r.loja):""}${r.volume!=null?" · "+fmtN(r.volume)+(r.volume===1?" palete":" paletes"):""}${r.obs?" · "+esc(r.obs):""}</div>
+        <div class="r2">${!r.agenda?`<span><span class="k">Sem envio e agenda · agende no portal ML e informe aqui</span></span>`:c===1?`<span><span class="k">Informar R.F.</span> <b>${br(r.rf)}</b> ${wdS(r.rf)} · ${prazoTxt(r.duRf)}</span><span><span class="k">Cronograma até</span> <b>${br(r.lim)}</b> ${wdS(r.lim)} · ${prazoTxt(r.duLim)}</span>`:""}<span>${r.agenda?`<span class="k">Agenda</span> <b>${br(r.agenda)}</b> ${wdS(r.agenda)}${c!==1?" · "+prazoTxt(r.duAg):""}`:""}</span></div>
         ${canWrite?`<div class="r3"><button class="adv" data-adv="${esc(r.id)}" title="Registrar avanço com a data de hoje">→ ${ST[c+1].nome}</button></div>`:""}
       </div>`).join("");
     const sub={1:"roteirizadas, ainda fora do cronograma",2:"no cronograma, aguardando produção",3:"produzindo agora"}[c];
@@ -550,7 +552,7 @@ function vPainel(){
       ${cards||`<div class="none">Nenhuma carga.</div>`}${list.length>MAX?`<div class="more">+ ${list.length-MAX} na tabela abaixo</div>`:""}</div>`;
   }).join("");
   const envMap=new Map(); rows.forEach(r=>{if(!envMap.has(r.envio))envMap.set(r.envio,[]);envMap.get(r.envio).push(r);});
-  const envios=[...envMap.entries()].map(([e,l])=>{const a=l.filter(aberta);return {e,l,a,key:a.length?Math.min(...a.map(r=>r.key)):Infinity};}).filter(x=>x.a.length).sort((a,b)=>a.key-b.key);
+  const envios=[...envMap.entries()].map(([e,l])=>{const a=l.filter(aberta);return {e,l,a,key:a.length?Math.min(...a.map(r=>r.key)):Infinity};}).filter(x=>x.a.length&&x.e).sort((a,b)=>a.key-b.key);
   const envCards=envios.slice(0,MAX).map(x=>{
     const allSel=x.a.every(r=>sel.has(r.id)), some=x.a.some(r=>sel.has(r.id));
     const ags=[...new Set(x.a.map(r=>r.agenda).filter(Boolean))].sort();
@@ -573,7 +575,7 @@ function vPainel(){
     +(fixos.includes(filtro)?"":`<button class="chip" data-f="${filtro}" aria-pressed="true">${ST[filtro].nome} ✕</button>`);
   const visAll=vis.length&&vis.every(r=>sel.has(r.id)), visSome=vis.some(r=>sel.has(r.id));
   const trow=r=>`<tr class="${aberta(r)?"":"closed"} ${r.nivel==="crit"?"crit":""} ${sel.has(r.id)?"on":""}" style="${cv(r.cod)};${av(r)}">
-      <td class="w">${ckb(r.id)}</td><td class="mono">${esc(r.envio)}</td><td class="mono">${cgBtn(r)}</td><td>${esc(r.galpao)||"—"}</td><td class="mono">${esc(r.loja)||"—"}</td>
+      <td class="w">${ckb(r.id)}</td><td class="mono">${r.envio?esc(r.envio):'<span class="small">sem envio</span>'}</td><td class="mono">${cgBtn(r)}</td><td>${esc(r.galpao)||"—"}</td><td class="mono">${esc(r.loja)||"—"}</td>
       <td><span class="pill">${ST[r.cod].nome}</span></td><td class="mono">${br(r.rot)}</td>
       <td class="mono">${br(r.rf)}${r.cod===1?`<div class="small">${prazoTxt(r.duRf)}</div>`:""}</td>
       <td class="mono">${br(r.lim)}${r.cod===1?`<div class="small">${prazoTxt(r.duLim)}</div>`:""}</td>
@@ -583,12 +585,12 @@ function vPainel(){
   return `<section class="prod" aria-label="Cargas para produção"><div class="in">
       <div class="prodhead"><h2>Cargas para produção${galpaoF?" · "+(galpaoF==="__sem"?"sem galpão":"Galpão "+esc(galpaoF)):""}</h2>
       <div class="rule"><span>Regra: entrar no cronograma até</span>${canAdmin?`<span class="rg" role="group" aria-label="Dias úteis antes da agenda"><button data-regra="-1" aria-label="Diminuir um dia" ${cfg.regraDias<=1||salvandoRegra?"disabled":""}>−</button><output aria-live="polite">${cfg.regraDias}</output><button data-regra="1" aria-label="Aumentar um dia" ${cfg.regraDias>=20||salvandoRegra?"disabled":""}>+</button></span><b>${cfg.regraDias===1?"dia útil":"dias úteis"} antes da agenda</b>`:`<b>${pl(cfg.regraDias,"dia útil","dias úteis")} antes da agenda</b>`}<span>· Informar R.F.</span>${canAdmin?`<span class="rg" role="group" aria-label="Dias úteis antes do cronograma para informar R.F."><button data-rf="-1" aria-label="Diminuir um dia" ${cfg.rfDias<=0||salvandoRegra?"disabled":""}>−</button><output aria-live="polite">${cfg.rfDias}</output><button data-rf="1" aria-label="Aumentar um dia" ${cfg.rfDias>=10||salvandoRegra?"disabled":""}>+</button></span><b>${cfg.rfDias===1?"dia útil":"dias úteis"} antes do cronograma</b>`:`<b>${pl(cfg.rfDias,"dia útil","dias úteis")} antes do cronograma</b>`}<span>· d.u. = dias úteis${canWrite?" · clique no número da carga para mudar o status":""}</span></div></div>
-      ${hero}<div class="cols">${prodCols}${envCol}</div></div></section>
+      ${hero}${avisoAgenda}<div class="cols">${prodCols}${envCol}</div></div></section>
     <div class="in main">
       <section aria-label="Status das cargas"><div class="label" style="margin-bottom:8px">Todas as cargas por status · clique para filtrar a tabela</div><div class="flow">${flow}</div></section>
       <section style="display:grid;gap:10px">
         <div class="bar"><div class="label">Fila de acompanhamento · críticas primeiro</div><div class="chips"><input type="text" class="search" id="busca" placeholder="Buscar carga, envio, loja ou obs." value="${esc(busca)}" aria-label="Buscar">${chips}</div></div>
-        <div class="tablebox"><table class="t"><thead><tr><th class="w"><input type="checkbox" id="selall" ${visAll?"checked":""} ${visSome&&!visAll?'data-ind="1"':""} aria-label="Selecionar todas desta visão"></th><th>Envio</th><th>Carga</th><th>Galpão</th><th>Loja</th><th>Status</th><th>Roteirização</th><th>Informar R.F.</th><th>Cronograma até</th><th>Agenda ML</th><th class="num">Volume</th><th>Ação</th><th>Alerta</th><th>Obs.</th></tr></thead>
+        <div class="tablebox"><table class="t"><thead><tr><th class="w"><input type="checkbox" id="selall" ${visAll?"checked":""} ${visSome&&!visAll?'data-ind="1"':""} aria-label="Selecionar todas desta visão"></th><th>Envio</th><th>Carga</th><th>Galpão</th><th>Loja</th><th>Status</th><th>Roteirização</th><th>Informar R.F.</th><th>Cronograma até</th><th>Agenda ML</th><th class="num">Paletes</th><th>Ação</th><th>Alerta</th><th>Obs.</th></tr></thead>
         <tbody>${vis.length?vis.map(trow).join(""):`<tr><td colspan="14" class="empty">Nenhuma carga nesta visão.</td></tr>`}</tbody></table></div>
       </section>
       <footer><div>"Cronograma até" é calculado: agenda menos ${pl(cfg.regraDias,"dia útil","dias úteis")}. "Informar R.F." é ${pl(cfg.rfDias,"dia útil","dias úteis")} antes do cronograma. Dias úteis sem sábados, domingos e feriados${cfg.feriadosExtras.length?" (nacionais + "+cfg.feriadosExtras.length+" cadastrados)":" nacionais"}.</div>
@@ -596,7 +598,7 @@ function vPainel(){
     </div>`;
 }
 const fmtN=(n)=>Number(n).toLocaleString("pt-BR",{maximumFractionDigits:2});
-function sumVol(list){const v=list.filter(r=>r.volume!=null);if(!v.length)return "";return " · Vol. "+fmtN(v.reduce((s,r)=>s+r.volume,0));}
+function sumVol(list){const v=list.filter(r=>r.volume!=null);if(!v.length)return "";const t=v.reduce((s,r)=>s+r.volume,0);return " · "+fmtN(t)+(t===1?" palete":" paletes");}
 
 /* ---------- aba Calendário ---------- */
 function segunda(n){const w=new Date(n*864e5).getUTCDay();return n-((w+6)%7);}
@@ -611,14 +613,14 @@ function vCalendario(){
   const gs=galpoesInfo().map(([g])=>g); if(galpaoF){gs.length=0;gs.push(galpaoF);}
   const byCell=(g,n)=>itens.filter(r=>(r.galpao||"__sem")===g&&dayOf(dateOf(r))===n).sort((a,b)=>a.envio.localeCompare(b.envio)||a.carga.localeCompare(b.carga));
   // cargas conjugadas = mais de uma carga em aberto no mesmo envio
-  const envAll=new Map(); allRows.filter(aberta).forEach(r=>{if(!envAll.has(r.envio))envAll.set(r.envio,[]);envAll.get(r.envio).push(r);});
+  const envAll=new Map(); allRows.filter(r=>aberta(r)&&r.envio).forEach(r=>{if(!envAll.has(r.envio))envAll.set(r.envio,[]);envAll.get(r.envio).push(r);});
   envAll.forEach(l=>l.sort((a,b)=>a.carga.localeCompare(b.carga)));
   const conj=[...envAll.keys()].filter(e=>envAll.get(e).length>1).sort();
   const cor=new Map(conj.map((e,i)=>[e,(i%6)+1]));
   const chip=(r)=>{const k=aberta(r)?cor.get(r.envio):undefined; const l=k?envAll.get(r.envio):null;
     const outros=l?l.filter(x=>x.id!==r.id).map(x=>x.carga+" ("+(x.galpao||"sem galpão")+", "+br(dateOf(x))+")").join(", "):"";
     const tt=ST[r.cod].nome+" · Envio "+r.envio+(r.loja?" · Loja "+r.loja:"")+" · "+r.alerta+(l?" · Conjugada com: "+outros:"");
-    return `<button class="cc ${k?"conj":""}" data-open="${esc(r.id)}" data-env="${esc(r.envio)}" style="${cv(r.cod)};${av(r)}${k?`;--cj:var(--cj${k})`:""}" title="${esc(tt)}"><span class="l1">${esc(r.carga)}${r.nivel!=="ok"&&r.nivel!=="none"?'<span class="a"></span>':""}</span>${k?`<span class="cj">⛓ ${esc(r.envio)} · ${l.findIndex(x=>x.id===r.id)+1}/${l.length}</span>`:aberta(r)?`<span class="cj solo">${esc(r.envio)} · 1/1</span>`:""}</button>`;};
+    return `<button class="cc ${k?"conj":""}" data-open="${esc(r.id)}" data-env="${esc(r.envio)}" style="${cv(r.cod)};${av(r)}${k?`;--cj:var(--cj${k})`:""}" title="${esc(tt)}"><span class="l1">${esc(r.carga)}${r.nivel!=="ok"&&r.nivel!=="none"?'<span class="a"></span>':""}</span>${k?`<span class="cj">⛓ ${esc(r.envio)} · ${l.findIndex(x=>x.id===r.id)+1}/${l.length}</span>`:aberta(r)&&r.envio?`<span class="cj solo">${esc(r.envio)} · 1/1</span>`:""}</button>`;};
   const MESES=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
   let corpo, titulo, nav, extra="", diasRef=dias;
   const vistaSeg=`<div class="seg" role="group" aria-label="Período"><button data-calv="semana" aria-pressed="${calVista==="semana"}">Semana</button><button data-calv="mes" aria-pressed="${calVista==="mes"}">Mês</button></div>`;
@@ -673,7 +675,7 @@ function vCalendario(){
         const avisos=[]; if(ds.length>1) avisos.push("datas diferentes"); if(sts.length>1) avisos.push("status diferentes");
         return `<div class="cjitem" data-env="${esc(e)}" style="--cj:var(--cj${cor.get(e)})"><span>⛓ Envio <b>${esc(e)}</b> · ${pl(l.length,"carga")}${sumVol(l)}</span><span class="small">${l.map(r=>esc(r.carga)).join(" + ")}</span><span class="small">${gs.length>1?"Galpões "+gs.map(esc).join(" + "):"Galpão "+esc(gs[0])} · ${ds.map(d=>br(d)).join(", ")||"sem data"}${avisos.length?` · <span class="w">${avisos.join(", ")}</span>`:""}</span></div>`;}).join("")}</div></section>`;})()}
     <div class="legend">${ORDEM.filter(c=>c!==0).map(c=>`<span style="${cv(c)}"><span class="dot"></span>${ST[c].nome}</span>`).join("")}<span><span class="dot" style="--c:var(--crit)"></span>bolinha = alerta (atrasada, risco, atenção)</span><span><span class="cj" style="--cj:var(--cj1)">⛓ envio · 1/2</span>carga conjugada: número do envio e posição dela no envio</span><span><span class="cj solo">envio · 1/1</span>carga sozinha no envio</span>${calVista==="mes"?`<span>no mês o número do envio aparece ao passar o mouse</span>`:""}</div>
-    <footer><div>${calModo==="cron"?"Cada carga aparece no dia limite para entrar no cronograma (agenda − "+cfg.regraDias+" d.u.). \"a incluir\" = ainda aguardando cronograma.":"Cada carga aparece no dia da agenda de entrega no Mercado Livre."} Clique numa carga para ver detalhes e mudar o status.${calVista==="mes"?" Clique no dia para abrir a semana dele.":""} Volume aparece quando a coluna VOLUME está preenchida na base.</div></footer>
+    <footer><div>${calModo==="cron"?"Cada carga aparece no dia limite para entrar no cronograma (agenda − "+cfg.regraDias+" d.u.). \"a incluir\" = ainda aguardando cronograma.":"Cada carga aparece no dia da agenda de entrega no Mercado Livre."} Clique numa carga para ver detalhes e mudar o status.${calVista==="mes"?" Clique no dia para abrir a semana dele.":""} Paletes aparecem quando a coluna PALETES está preenchida na base.</div></footer>
   </div>`;
 }
 
@@ -732,7 +734,7 @@ function vIndicadores(){
     </div>
     <div class="two">
       <div class="panel"><h3>Por galpão</h3><div style="overflow-x:auto"><table class="s"><thead><tr><th>Galpão</th><th>Em aberto</th><th>Cronograma no prazo</th><th>Entrega no prazo</th></tr></thead><tbody>
-        ${porG.map(x=>`<tr><td><b>${x.g==="__sem"?"Sem galpão":esc(x.g)}</b></td><td class="mono">${x.ab}${x.temVol?` <span class="small">· vol. ${fmtN(x.vol)}</span>`:""}</td><td>${barra(x.p1,x.n1)}</td><td>${barra(x.p2,x.n2)}</td></tr>`).join("")||`<tr><td colspan="4" class="small">Sem cargas.</td></tr>`}
+        ${porG.map(x=>`<tr><td><b>${x.g==="__sem"?"Sem galpão":esc(x.g)}</b></td><td class="mono">${x.ab}${x.temVol?` <span class="small">· ${fmtN(x.vol)} pal.</span>`:""}</td><td>${barra(x.p1,x.n1)}</td><td>${barra(x.p2,x.n2)}</td></tr>`).join("")||`<tr><td colspan="4" class="small">Sem cargas.</td></tr>`}
       </tbody></table></div></div>
       <div class="panel"><h3>Tempo médio em cada etapa <span class="small">(dias úteis)</span></h3><table class="s"><thead><tr><th>Etapa</th><th class="num">Média</th><th class="num">Cargas</th></tr></thead><tbody>
         <tr><td>No cronograma até iniciar produção</td><td class="num mono">${fmt1(k.tCron)}</td><td class="num">${k.nT[0]}</td></tr>
@@ -750,12 +752,12 @@ function vIndicadores(){
 /* ================= gaveta da carga ================= */
 function abrir(id){ const d=docs.get(id); if(!d) return; openId=id; dConfirmDel=false; dMsg="";
   const r=allRows.find(x=>x.id===id)||calc(id,d,hojeN());
-  dForm={status:String(r.cod),em:hojeIso(),obs:r.obs,agenda:r.agenda,galpao:r.galpao,loja:r.loja,volume:r.volume==null?"":String(r.volume),rot:r.rot};
+  dForm={status:String(r.cod),em:hojeIso(),obs:r.obs,envio:r.envio,agenda:r.agenda,galpao:r.galpao,loja:r.loja,volume:r.volume==null?"":String(r.volume),rot:r.rot};
   renderDrawer(); pedirNomes(r.hist.map(h=>h.por).filter(Boolean)); }
 function fechar(){openId=null;dForm=null;$("#drawer").innerHTML="";}
 function histTxt(h){
   if(h.tipo==="status") return h.de==null?`Entrou no painel como <b>${ST[h.para]?ST[h.para].nome:"?"}</b>`:`Status: ${ST[h.de]?ST[h.de].nome:"?"} → <b>${ST[h.para]?ST[h.para].nome:"?"}</b>`;
-  const nm={agenda:"Agenda",galpao:"Galpão",loja:"Loja destino",rot:"Roteirização",volume:"Volume"}[h.tipo]||h.tipo;
+  const nm={agenda:"Agenda",galpao:"Galpão",loja:"Loja destino",envio:"Envio",rot:"Roteirização",volume:"Paletes"}[h.tipo]||h.tipo;
   const f=(v)=>h.tipo==="agenda"||h.tipo==="rot"?brA(v):(v===""||v==null?"—":h.tipo==="volume"?fmtN(v):esc(v));
   return `${nm}: ${f(h.de)} → <b>${f(h.para)}</b>`;
 }
@@ -774,11 +776,11 @@ function renderDrawerInfo(){
       <div><span class="label">Cronograma até</span><span class="v mono">${brA(r.lim)} ${wdS(r.lim)}${r.cod===1?" · "+prazoTxt(r.duLim):""}</span></div>
       <div><span class="label">Agenda ML</span><span class="v mono">${brA(r.agenda)} ${wdS(r.agenda)}${aberta(r)?" · "+prazoTxt(r.duAg):""}</span></div>
       <div><span class="label">Roteirização</span><span class="v mono">${brA(r.rot)}</span></div>
-      <div><span class="label">Volume</span><span class="v mono">${r.volume!=null?fmtN(r.volume):"—"}</span></div>
+      <div><span class="label">Paletes</span><span class="v mono">${r.volume!=null?fmtN(r.volume):"—"}</span></div>
       ${r.acao?`<div style="grid-column:1/-1"><span class="label">Próxima ação</span><span class="v">${esc(r.acao)}</span></div>`:""}
     </div>
     <section style="display:grid;gap:8px"><span class="label">Histórico</span>
-      ${hist.length?`<ul class="tl">${hist.map(h=>`<li style="${h.tipo==="status"&&ST[h.para]?cv(h.para):"--c:var(--muted)"}"><span class="b"></span><div><div class="tx">${histTxt(h)}</div><div class="sm">${h.tipo==="status"&&h.em?"em "+brA(h.em)+" · ":""}${h.origem==="base"?"pela planilha":h.origem==="inicial"?"situação inicial":"no painel"}${(nomeDe(h.por)||h.porNome)?" · "+esc(nomeDe(h.por)||h.porNome):""}${h.reg?" · registrado "+dtHora(h.reg):""}</div></div></li>`).join("")}</ul>`:`<p class="small" style="margin:0">Sem histórico.</p>`}
+      ${hist.length?`<ul class="tl">${hist.map(h=>`<li style="${h.tipo==="status"&&ST[h.para]?cv(h.para):"--c:var(--muted)"}"><span class="b"></span><div><div class="tx">${histTxt(h)}</div><div class="sm">${h.tipo==="status"&&h.em?"em "+brA(h.em)+" · ":""}${h.origem==="base"?"pela planilha":h.origem==="wms"?"pelo WMS":h.origem==="inicial"?"situação inicial":"no painel"}${(nomeDe(h.por)||h.porNome)?" · "+esc(nomeDe(h.por)||h.porNome):""}${h.reg?" · registrado "+dtHora(h.reg):""}</div></div></li>`).join("")}</ul>`:`<p class="small" style="margin:0">Sem histórico.</p>`}
     </section>`;
 }
 function renderDrawer(){
@@ -791,18 +793,19 @@ function renderDrawer(){
       <div class="fgrid"><label>Data em que aconteceu<input type="date" id="dem" value="${esc(f.em)}" max="${hojeIso()}"></label><span class="small" style="align-self:end">Usada nos indicadores. Ajuste se a mudança aconteceu em outro dia.</span></div>
       <span class="label" style="margin-top:6px">Dados da carga</span>
       <div class="fgrid">
+        <label>Envio (portal ML)<input type="text" id="den" inputmode="numeric" value="${esc(f.envio)}" placeholder="nº do envio"></label>
         <label>Agenda ML<input type="date" id="dag" value="${esc(f.agenda)}"></label>
         <label>Galpão<input type="text" id="dga" value="${esc(f.galpao)}" list="glist"><datalist id="glist">${gs.map(g=>`<option value="${esc(g)}">`).join("")}</datalist></label>
         <label>Loja destino<input type="text" id="dlj" value="${esc(f.loja)}" list="llist"><datalist id="llist">${[...new Set(allRows.map(x=>x.loja).filter(Boolean))].map(l=>`<option value="${esc(l)}">`).join("")}</datalist></label>
         <label>Roteirização<input type="date" id="dro" value="${esc(f.rot)}"></label>
-        <label>Volume<input type="number" id="dvo" value="${esc(f.volume)}" min="0" step="any"></label>
+        <label>Paletes<input type="number" id="dvo" value="${esc(f.volume)}" min="0" step="any"></label>
       </div>
       <label style="display:grid;gap:4px;font-size:13px;font-weight:600">Observação<textarea id="dob">${esc(f.obs)}</textarea></label>
       <div class="actions"><button class="btn" id="dsave" ${dSaving?"disabled":""}>${dSaving?"Salvando…":"Salvar"}</button><button class="btn ghost" id="dclose2">Fechar</button><span class="toast ${dMsg.startsWith("!")?"err":""}" id="dmsg">${esc(dMsg.replace(/^!/,""))}</span></div>
       ${canAdmin?(dConfirmDel?`<div class="confirm"><b>Excluir a carga ${esc(r.carga)} do painel?</b><span class="small">O histórico dela também some. Use só para lançamentos errados; para carga que não vai sair, prefira o status Cancelada.</span><div class="actions"><button class="btn danger" id="ddel2">Excluir definitivamente</button><button class="btn ghost" id="ddelno">Manter</button></div></div>`:`<div><button class="btn danger sm" id="ddel">Excluir carga</button></div>`):""}
     </section>`:`<p class="small">Você tem acesso só de leitura a este painel.</p>`;
   $("#drawer").innerHTML=`<div class="shade" data-close="1"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Carga ${esc(r.carga)}"><div class="dw">
-    <div class="dhead"><div><span class="label">Carga</span><div class="c">${esc(r.carga)}</div><span class="small">Envio ${esc(r.envio)}${r.galpao?" · Galpão "+esc(r.galpao):""}${r.loja?" · Loja "+esc(r.loja):""}</span></div><button class="x" data-close="1" aria-label="Fechar">×</button></div>
+    <div class="dhead"><div><span class="label">Carga</span><div class="c">${esc(r.carga)}</div><span class="small">${r.envio?"Envio "+esc(r.envio):"Sem envio"}${r.galpao?" · Galpão "+esc(r.galpao):""}${r.loja?" · Loja "+esc(r.loja):""}</span></div><button class="x" data-close="1" aria-label="Fechar">×</button></div>
     <div id="dinfo" style="display:grid;gap:18px"></div>
     ${form}
   </div></aside>`;
@@ -815,7 +818,7 @@ async function salvarCarga(){
   const entradas=[]; const patch={};
   if(novo!==atual){ if(!f.em){dMsg="!Informe a data em que a mudança aconteceu.";renderDrawer();return;}
     entradas.push({tipo:"status",de:atual,para:novo,em:f.em,reg:now,por,origem:"painel"}); patch.status=novo; }
-  const cmp=[["agenda","agenda"],["galpao","galpao"],["loja","loja"],["rot","rot"]];
+  const cmp=[["envio","envio"],["agenda","agenda"],["galpao","galpao"],["loja","loja"],["rot","rot"]];
   cmp.forEach(([k])=>{const nv=String(f[k]||"").trim(), ov=String(d[k]||"");if(nv!==ov){entradas.push({tipo:k,de:ov,para:nv,em:hojeIso(),reg:now,por,origem:"painel"});patch[k]=nv;}});
   const vol=f.volume===""?null:Number(f.volume); const ov=typeof d.volume==="number"?d.volume:null;
   if(!(vol===ov||(vol!=null&&isNaN(vol)))){entradas.push({tipo:"volume",de:ov==null?"":ov,para:vol==null?"":vol,em:hojeIso(),reg:now,por,origem:"painel"});patch.volume=vol;}
@@ -850,7 +853,23 @@ function renderXbar(){
   $("#xbar").innerHTML=`<div class="xbar"><div class="in">
     <span><b>${n}</b> ${n>1?"cargas selecionadas":"carga selecionada"} em ${pl(new Set(list.map(r=>r.envio)).size,"envio")}${sumVol(list)}</span>
     <span class="actions">${canWrite?`<label class="actions" style="gap:6px;font-size:13px">Mudar para <select id="bst">${ORDEM.map(c=>`<option value="${c}" ${String(c)===bulkSt?"selected":""}>${ST[c].nome}</option>`).join("")}</select> em <input type="date" id="bdt" value="${esc(bulkData||hojeIso())}" max="${hojeIso()}"></label><button class="btn ghost" id="bapl" ${bulkBusy?"disabled":""}>${bulkBusy?"Aplicando…":"Aplicar"}</button>`:""}
-    <button class="btn ghost" id="limpar">Limpar</button><button class="btn" id="exportar">Exportar para Excel</button></span></div></div>`;
+    <button class="btn ghost" id="limpar">Limpar</button><button class="btn" id="exportar">Exportar para Excel</button></span>
+    ${canWrite?`<span class="actions" style="flex-basis:100%;justify-content:flex-end"><label class="actions" style="gap:6px;font-size:13px">Agendar: envio <input type="text" id="ben" inputmode="numeric" placeholder="nº do envio" value="${esc(bulkEnvio)}" style="width:120px"> agenda <input type="date" id="bag" value="${esc(bulkAgenda)}"></label><button class="btn ghost" id="bagd" ${bulkBusy?"disabled":""}>Agendar ${n>1?"as "+n:"a carga"}</button></span>`:""}</div></div>`;
+}
+async function aplicarAgenda(){
+  const env=String(bulkEnvio||"").trim(), ag=bulkAgenda||""; if(!env&&!ag){setToast("Informe o número do envio e/ou a data de agenda.",true);return;}
+  if(env&&!/^\d+$/.test(env)){setToast("O número do envio deve ter só números.",true);return;}
+  const ids=[...sel].filter(id=>docs.has(id)); const now=new Date().toISOString();
+  bulkBusy=true; renderXbar(); let ok=0, err=null;
+  await emLotes(ids,4,async(id)=>{const d=docs.get(id);const patch={};const ent=[];
+    if(env&&env!==String(d.envio||"")){patch.envio=env;ent.push({tipo:"envio",de:d.envio||"",para:env,em:hojeIso(),reg:now,por:meId||null,origem:"painel"});}
+    if(ag&&ag!==String(d.agenda||"")){patch.agenda=ag;ent.push({tipo:"agenda",de:d.agenda||"",para:ag,em:hojeIso(),reg:now,por:meId||null,origem:"painel"});}
+    if(!ent.length){ok++;return;}
+    patch.hist=(d.hist||[]).concat(ent);patch.atualizadoEm=now;patch.atualizadoPor=meId||null;
+    try{await db.collection("cargas").doc(id).update(patch);ok++;}catch(e){err=e;}});
+  bulkBusy=false; if(ok) marcarSujo(true);
+  if(!err){bulkEnvio="";bulkAgenda="";}
+  setToast(err?`${ok} de ${ids.length} agendadas. ${erroTxt(err)}`:`${pl(ok,"carga agendada","cargas agendadas")}${env?" no envio "+env:""}${ag?" para "+brA(ag):""}.`,!!err);
 }
 async function aplicarLote(){
   const novo=Number(bulkSt), em=bulkData||hojeIso(), now=new Date().toISOString();
@@ -879,9 +898,9 @@ const serial=(s)=>{const n=dayOf(s);return n==null?null:n+25569;}; // data → n
 function planilhaBase(list,comHist){
   const H=4; // linha do cabeçalho
   const aoa=[["BASE DE CARGAS — Painel de Cargas","","","","","","","","","DIAS ÚTEIS ANTES DA AGENDA (altere aqui)","DIAS ÚTEIS ANTES DO CRONOGRAMA P/ INFORMAR R.F. (altere aqui)"],
-    ["Uma linha por carga (repita o envio quando tiver mais de uma carga). VOLUME é opcional. As datas de cronograma e de informar R.F. são calculadas pelas regras das células J2 e K2. Não mude os nomes do cabeçalho.","","","","","","","","",cfg.regraDias,cfg.rfDias],
+    ["Uma linha por carga (repita o envio quando tiver mais de uma carga). PALETES vem do WMS. As datas de cronograma e de informar R.F. são calculadas pelas regras das células J2 e K2. Não mude os nomes do cabeçalho.","","","","","","","","",cfg.regraDias,cfg.rfDias],
     [],
-    ["#ENVIO","CARGA","GALPÃO","LOJA DESTINO","DATA ROTEIRIZAÇÃO","DATA AGENDA","STATUS","VOLUME","OBSERVAÇÃO","DATA CRONOGRAMA (calculada)","DATA INFORMAR R.F. (calculada)","ALERTA (na exportação)","AÇÃO (na exportação)"]]
+    ["#ENVIO","CARGA","GALPÃO","LOJA DESTINO","DATA ROTEIRIZAÇÃO","DATA AGENDA","STATUS","PALETES","OBSERVAÇÃO","DATA CRONOGRAMA (calculada)","DATA INFORMAR R.F. (calculada)","ALERTA (na exportação)","AÇÃO (na exportação)"]]
     .concat(list.map(r=>[num(r.envio),num(r.carga),r.galpao,num(r.loja),D12(r.rot),D12(r.agenda),ST[r.cod].plan,r.volume==null?"":r.volume,r.obs,"","",r.alerta,r.acao]));
   const ws=XLSX.utils.aoa_to_sheet(aoa,{cellDates:true,dateNF:"dd/mm/yyyy"});
   const anos=[...new Set([hojeN(),...list.map(r=>dayOf(r.agenda)).filter(x=>x!=null)].map(n=>new Date(n*864e5).getUTCFullYear()))];
@@ -900,7 +919,7 @@ function planilhaBase(list,comHist){
   fs["!cols"]=[{wch:14},{wch:36}]; XLSX.utils.book_append_sheet(wb,fs,"FERIADOS");
   if(comHist){
     const h=[["#ENVIO","CARGA","REGISTRADO EM","O QUE MUDOU","DE","PARA","DATA DO FATO","ORIGEM","QUEM"]];
-    list.forEach(r=>r.hist.forEach(x=>{const st=x.tipo==="status";h.push([num(r.envio),num(r.carga),x.reg?new Date(x.reg):"",st?"STATUS":x.tipo.toUpperCase(),st?(x.de==null?"":ST[x.de]?ST[x.de].plan:""):String(x.de??""),st?(ST[x.para]?ST[x.para].plan:""):String(x.para??""),st?D12(x.em):"",x.origem==="base"?"planilha":x.origem==="inicial"?"situação inicial":"painel",nomeDe(x.por)||x.porNome||""]);}));
+    list.forEach(r=>r.hist.forEach(x=>{const st=x.tipo==="status";h.push([num(r.envio),num(r.carga),x.reg?new Date(x.reg):"",st?"STATUS":x.tipo.toUpperCase(),st?(x.de==null?"":ST[x.de]?ST[x.de].plan:""):String(x.de??""),st?(ST[x.para]?ST[x.para].plan:""):String(x.para??""),st?D12(x.em):"",x.origem==="base"?"planilha":x.origem==="wms"?"WMS":x.origem==="inicial"?"situação inicial":"painel",nomeDe(x.por)||x.porNome||""]);}));
     const hs=XLSX.utils.aoa_to_sheet(h,{cellDates:true,dateNF:"dd/mm/yyyy"}); hs["!cols"]=[12,12,18,14,24,24,14,16,24].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb,hs,"HISTÓRICO");
     const rg=[["REGRA","VALOR"],["DIAS ÚTEIS ANTES DA AGENDA",cfg.regraDias],["DIAS ÚTEIS P/ INFORMAR R.F. (ANTES DO CRONOGRAMA)",cfg.rfDias],["ALERTA ATENÇÃO (DIAS ÚTEIS)",cfg.atencaoDias]].concat((cfg.feriadosExtras||[]).map(f=>["FERIADO EXTRA",D12(f)]));
@@ -973,24 +992,61 @@ function toISO(v){
   if(v instanceof Date){const d=new Date(v.getTime()+12*36e5);return iso(d.getFullYear(),d.getMonth()+1,d.getDate());}
   if(typeof v==="number"){const p=XLSX.SSF.parse_date_code(v);return p?iso(p.y,p.m,p.d):"";}
   const s=String(v).trim(); let m;
-  if(m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/)){let y=+m[3];if(y<100)y+=2000;return iso(y,+m[2],+m[1]);}
+  if(m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?$/)){let y=+m[3];if(y<100)y+=2000;return iso(y,+m[2],+m[1]);}
   if(m=s.match(/^(\d{4})-(\d{2})-(\d{2})/)) return iso(+m[1],+m[2],+m[3]);
   return "?";
 }
+function idPorCarga(){const m=new Map();docs.forEach((d,id)=>{if(d&&d.carga!=null)m.set(String(d.carga),id);});return m;}
+/* Status das ordens no Infor WMS → status do painel (a confirmar com a operação: 02 e 95 já vistos no relatório) */
+const WMS_ST={"00":["Vazia",1],"02":["Criada (integração)",1],"04":["Criada internamente",1],"06":["Não iniciada",1],"08":["Convertida",1],"09":["Não iniciada",1],
+  "11":["Parcialmente pré-alocada",2],"12":["Pré-alocada",2],"13":["Parcialmente alocada",2],"14":["Parcialmente alocada",2],"15":["Alocada / separada parcial",3],"17":["Alocada",2],"19":["Substituída",2],
+  "22":["Parcialmente liberada",2],"25":["Liberada / separada parcial",3],"29":["Liberada",2],
+  "51":["Em separação",3],"52":["Separada parcialmente",3],"55":["Separação completa",4],
+  "61":["Em embalagem",4],"68":["Embalagem completa",4],"75":["Em preparação de doca",4],"82":["Em carregamento",4],"88":["Carregada",4],
+  "16":["Alocada / expedida parcial",5],"27":["Liberada / expedida parcial",5],"53":["Separada / expedida parcial",5],"57":["Separada / expedida parcial",5],"92":["Expedida parcialmente",5],"94":["Expedida",5],"95":["Expedida completa",5],
+  "96":["Entregue",6],"98":["Cancelada externamente",0],"99":["Cancelada internamente",0]};
+const WMS_COLS={ORDERKEY:"Nº da ordem (carga)",ORDERDATE:"Data da ordem (roteirização)",EXT_UDF_LKUP1:"Lista de códigos CDU 1 (galpão)",CONSIGNEEKEY:"Receptor (loja destino)",TOTALPALLETESTIMATE:"Estimativa de palete total",STATUS:"Status",ACTUALSHIPDATE:"Data real de expedição",EDITDATE:"Data da atualização"};
+function lerWMS(nome,a,hi){
+  const h=a[hi].map(c=>String(c||"").trim().toUpperCase()); const c=k=>h.indexOf(k);
+  const ci={carga:c("ORDERKEY"),rot:c("ORDERDATE"),galpao:c("EXT_UDF_LKUP1"),loja:c("CONSIGNEEKEY"),pal:c("TOTALPALLETESTIMATE"),st:c("STATUS"),exp:c("ACTUALSHIPDATE"),edit:c("EDITDATE")};
+  const numero=v=>{if(v===""||v==null)return null;if(typeof v==="number")return v;const n=parseFloat(String(v).replace(/,/g,""));return isNaN(n)?null:n;};
+  const linhas=[];
+  a.slice(hi+1).forEach((row,i)=>{
+    const car=String(row[ci.carga]??"").trim(); if(!car||/^(MESSAGES|N.º DA ORDEM|Nº DA ORDEM)/i.test(String(row[0]||"")+car)) return;
+    if(!/^\d+$/.test(car)) return;
+    const g=k=>ci[k]<0?"":row[ci[k]];
+    const st=String(g("st")??"").trim().padStart(2,"0");
+    const rot=toISO(g("rot")), exp=toISO(g("exp")), edit=toISO(g("edit"));
+    const loja=String(g("loja")??"").trim();
+    linhas.push({linha:hi+i+2,carga:car,rot:rot==="?"?"":rot,galpao:String(g("galpao")||"").trim(),loja,volume:numero(g("pal")),wms:st,exp:exp==="?"?"":exp,edit:edit==="?"?"":edit});
+  });
+  return {tipo:"wms",aba:nome,linhas,usadas:Object.keys(WMS_COLS).filter(k=>c(k)>=0),totalColunas:h.filter(Boolean).length};
+}
+function areaReal(ws){ // alguns sistemas (ex.: WMS) declaram a área da planilha menor do que ela é
+  let r0=1e9,c0=1e9,r1=-1,c1=-1;
+  Object.keys(ws).forEach(k=>{if(k[0]==="!")return;const a=XLSX.utils.decode_cell(k);if(a.r<r0)r0=a.r;if(a.c<c0)c0=a.c;if(a.r>r1)r1=a.r;if(a.c>c1)c1=a.c;});
+  if(r1>=0) ws["!ref"]=XLSX.utils.encode_range({s:{r:Math.min(r0,0),c:Math.min(c0,0)},e:{r:r1,c:c1}});
+}
 function lerPlanilha(buf){
   const wb=XLSX.read(buf,{type:"array",cellDates:true});
+  wb.SheetNames.forEach(n=>areaReal(wb.Sheets[n]));
+  for(const nome of wb.SheetNames){
+    const a=XLSX.utils.sheet_to_json(wb.Sheets[nome],{header:1,raw:true,defval:""}).slice(0,20);
+    const hw=a.findIndex(row=>row.some(c=>String(c).trim().toUpperCase()==="ORDERKEY")&&row.some(c=>String(c).trim().toUpperCase()==="STATUS"));
+    if(hw>=0) return lerWMS(nome,XLSX.utils.sheet_to_json(wb.Sheets[nome],{header:1,raw:true,defval:""}),hw);
+  }
   for(const nome of wb.SheetNames){
     const a=XLSX.utils.sheet_to_json(wb.Sheets[nome],{header:1,raw:true,defval:""});
     const hi=a.findIndex(row=>row.some(c=>norm(c)==="ENVIO")&&row.some(c=>norm(c).startsWith("CARGA")));
     if(hi<0) continue;
     const h=a[hi].map(norm), col=(...ks)=>h.findIndex(x=>ks.some(k=>x.includes(k)));
-    const ci={envio:h.indexOf("ENVIO"),carga:h.findIndex(x=>x.startsWith("CARGA")),galpao:col("GALPAO","GALPOES"),loja:col("LOJA"),rot:col("ROTERIZ","ROTEIRIZ"),agenda:h.findIndex(x=>x.includes("AGENDA")&&!x.includes("CRONOGRAMA")),status:col("STATUS"),obs:col("OBS"),volume:col("VOLUME")};
+    const ci={envio:h.indexOf("ENVIO"),carga:h.findIndex(x=>x.startsWith("CARGA")),galpao:col("GALPAO","GALPOES"),loja:col("LOJA"),rot:col("ROTERIZ","ROTEIRIZ"),agenda:h.findIndex(x=>x.includes("AGENDA")&&!x.includes("CRONOGRAMA")),status:col("STATUS"),obs:col("OBS"),volume:col("PALETE","VOLUME")};
     const linhas=[];
     a.slice(hi+1).forEach((row,i)=>{
-      const env=row[ci.envio]; if(env===""||env==null) return;
+      const env=row[ci.envio]; if((env===""||env==null)&&(ci.carga<0||row[ci.carga]===""||row[ci.carga]==null)) return;
       const g=k=>ci[k]<0?"":row[ci[k]];
       const vr=g("volume"); const vol=vr===""||vr==null?null:Number(String(vr).replace(",","."));
-      const base={linha:hi+i+2,envio:String(env).trim(),galpao:String(g("galpao")||"").trim(),loja:String(g("loja")??"").trim(),rot:toISO(g("rot")),agenda:toISO(g("agenda")),statusTxt:String(g("status")||"").trim(),obs:String(g("obs")||"").trim(),volume:vol,volRaw:vr};
+      const base={linha:hi+i+2,envio:String(env??"").trim(),galpao:String(g("galpao")||"").trim(),loja:String(g("loja")??"").trim(),rot:toISO(g("rot")),agenda:toISO(g("agenda")),statusTxt:String(g("status")||"").trim(),obs:String(g("obs")||"").trim(),volume:vol,volRaw:vr};
       const cargas=String(g("carga")).split(/[\/;,]/).map(x=>x.trim()).filter(Boolean);
       (cargas.length?cargas:[""]).forEach(c=>linhas.push({...base,carga:c}));
     });
@@ -1014,8 +1070,8 @@ function lerHist(wb){
     else{de=val(de);para=val(para);if(tipo==="volume"){de=de===""?"":Number(de);para=para===""?"":Number(para);}}
     const reg=r[c.reg] instanceof Date?r[c.reg].toISOString():String(r[c.reg]||"");
     const em=c.em>=0?toISO(r[c.em]):""; const o=norm(c.origem>=0?r[c.origem]:"");
-    const e={tipo,de,para,em:em==="?"?"":em,reg,por:null,porNome:c.quem>=0?String(r[c.quem]||""):"",origem:o.startsWith("PLANILHA")?"base":o.startsWith("SITUACAO")?"inicial":"painel"};
-    const id=docId(env,car); if(!m.has(id)) m.set(id,[]); m.get(id).push(e);
+    const e={tipo,de,para,em:em==="?"?"":em,reg,por:null,porNome:c.quem>=0?String(r[c.quem]||""):"",origem:o.startsWith("PLANILHA")?"base":o.startsWith("WMS")?"wms":o.startsWith("SITUACAO")?"inicial":"painel"};
+    if(!m.has(car)) m.set(car,[]); m.get(car).push(e);
   });
   return m;
 }
@@ -1049,32 +1105,103 @@ function diffRegras(rg){ // o que a planilha muda nas regras atuais
   return t.length?{novo:n,txt:t}:null;
 }
 function ultimoStatus(hist){const s=(hist||[]).filter(x=>x&&x.tipo==="status").sort((a,b)=>((a.reg||"")+(a.em||"")).localeCompare((b.reg||"")+(b.em||"")));return s.length?s[s.length-1].para:null;}
+const DIAS_EXP_RECENTE=7;
+function preverWMS(arquivo,lp){
+  const hoje=hojeN(), mapa=idPorCarga(), seen=new Set(); const novas=[], mud=[], iguais=[], ignoradas=[], recentes=[], desconhecidos=new Map(), resumo=new Map();
+  lp.linhas.forEach(l=>{
+    if(seen.has(l.carga)) return; seen.add(l.carga);
+    const w=WMS_ST[l.wms]; const k=resumo.get(l.wms)||{n:0,nome:w?w[0]:"Não reconhecido",para:w?w[1]:null}; k.n++; resumo.set(l.wms,k);
+    if(!w){desconhecidos.set(l.wms,(desconhecidos.get(l.wms)||0)+1);}
+    const cod=w?w[1]:null; const fato=(cod===5||cod===6)&&l.exp?l.exp:(l.edit||hojeIso());
+    const id=mapa.get(l.carga); const ex=id?docs.get(id):null;
+    if(!ex){
+      if(cod==null) return;
+      if(cod>=5||cod===0){ ignoradas.push(l); if(cod===5&&l.exp&&uteisEntre(dayOf(l.exp),hoje)<=DIAS_EXP_RECENTE) recentes.push({l,cod,fato}); return; }
+      novas.push({id:docId("",l.carga),l,cod,fato}); return;
+    }
+    const camp={}; [["galpao",l.galpao],["loja",l.loja],["rot",l.rot]].forEach(([k,v])=>{if(v&&String(v)!==String(ex[k]||""))camp[k]=v;});
+    if(l.volume!=null){const ov=typeof ex.volume==="number"?ex.volume:null; if(l.volume!==ov) camp.volume=l.volume;}
+    const at=typeof ex.status==="number"?ex.status:1; let para=null;
+    if(cod!=null&&cod!==at&&POS(cod)>POS(at)&&at!==6) para=cod;
+    if(para!=null||Object.keys(camp).length) mud.push({id,l,camp,de:at,para,fato}); else iguais.push(id);
+  });
+  return {tipo:"wms",arquivo,aba:lp.aba,usadas:lp.usadas,totalColunas:lp.totalColunas,novas,mud,iguais,ignoradas,recentes,incluirRecentes:false,
+    desconhecidos:[...desconhecidos.entries()],resumo:[...resumo.entries()].sort((a,b)=>a[0].localeCompare(b[0])),fase:"previa",feitos:0,total:0,erro:"",sujoAntes:modoLocal&&sujo&&docs.size>0};
+}
+function renderImpWMS(){
+  const p=imp;
+  const nomeSt=c=>c==null?"—":ST[c].nome;
+  const total=p.novas.length+p.mud.length+(p.incluirRecentes?p.recentes.length:0);
+  let corpo;
+  if(p.fase==="previa"){
+    const linhaMud=m=>{const parts=[];if(m.para!=null)parts.push(`${nomeSt(m.de)} → <b>${nomeSt(m.para)}</b> em ${br(m.fato)}`);Object.entries(m.camp).forEach(([k,v])=>{const n={galpao:"galpão",loja:"loja",rot:"roteirização",volume:"paletes"}[k];parts.push(`${n}: ${k==="rot"?br(v):esc(v)}`);});
+      return `<li><span class="mono"><b>${esc(m.l.carga)}</b></span><span>${parts.join(" · ")}</span></li>`;};
+    corpo=`<div class="sumg"><div><span class="label">Novas</span><b>${p.novas.length}</b></div><div><span class="label">Atualizadas</span><b>${p.mud.length}</b></div><div><span class="label">Sem mudança</span><b>${p.iguais.length}</b></div><div><span class="label">Ignoradas</span><b>${p.ignoradas.length}</b></div></div>
+      <p class="small" style="margin:0">Relatório do <b>WMS</b> reconhecido. Usei só ${p.usadas.length} das ${p.totalColunas} colunas: ${p.usadas.map(k=>WMS_COLS[k]).join(", ")}. O resto é ignorado.</p>
+      <section style="display:grid;gap:6px"><span class="label">Status do WMS neste arquivo</span><div style="overflow-x:auto"><table class="s"><thead><tr><th>WMS</th><th>Situação no WMS</th><th>Vira no painel</th><th class="num">Cargas</th></tr></thead><tbody>
+        ${p.resumo.map(([c,x])=>`<tr><td class="mono">${esc(c)}</td><td>${esc(x.nome)}</td><td>${x.para==null?'<span style="color:var(--crit)">não reconhecido, status mantido</span>':`<span class="pill" style="${cv(x.para)}">${ST[x.para].nome}</span>`}</td><td class="num mono">${x.n}</td></tr>`).join("")}
+      </tbody></table></div></section>
+      ${p.mud.length?`<section style="display:grid;gap:6px"><span class="label">Atualizações em cargas do painel</span><ul class="plist">${p.mud.map(linhaMud).join("")}</ul></section>`:""}
+      ${p.novas.length?`<section style="display:grid;gap:6px"><span class="label">Cargas novas (entram como ${nomeSt(1)}, sem envio e agenda)</span><ul class="plist">${p.novas.map(n=>`<li><span class="mono"><b>${esc(n.l.carga)}</b></span><span>${esc(n.l.galpao)||"sem galpão"} · loja ${esc(n.l.loja)||"—"} · ${n.l.volume!=null?fmtN(n.l.volume)+" paletes":"—"} · roteirizada em ${br(n.l.rot)}</span></li>`).join("")}</ul><span class="small">Depois de agendar no portal do Mercado Livre, informe o envio e a agenda no painel: marque as cargas e use <b>Agendar</b>.</span></section>`:""}
+      ${p.ignoradas.length?`<p class="small" style="margin:0">${pl(p.ignoradas.length,"carga já expedida ou cancelada que não está no painel foi ignorada","cargas já expedidas ou canceladas que não estão no painel foram ignoradas")} (histórico do WMS).</p>`:""}
+      ${p.recentes.length?`<label class="ck small"><input type="checkbox" id="imprec" ${p.incluirRecentes?"checked":""}>Incluir mesmo assim as ${p.recentes.length} expedidas nos últimos ${DIAS_EXP_RECENTE} dias úteis (entram como Expedida, sem envio e agenda)</label>`:""}
+      ${p.desconhecidos.length?`<div class="notice">Status do WMS não reconhecido: ${p.desconhecidos.map(([c,n])=>`<b>${esc(c)}</b> (${n})`).join(", ")}. Essas cargas mantêm o status atual. Me avise o que significam para eu incluir.</div>`:""}
+      ${p.sujoAntes?`<div class="notice">Há mudanças feitas neste navegador que ainda não foram para a planilha. O WMS só atualiza status para a frente, então elas não se perdem, mas lembre de clicar em Baixar base depois.</div>`:""}`;
+  } else if(p.fase==="gravando"){
+    corpo=`<p>Gravando ${p.feitos} de ${p.total}…</p><div class="prog"><i style="width:${p.total?Math.round(100*p.feitos/p.total):0}%"></i></div>`;
+  } else {
+    corpo=p.erro?`<div class="notice err">${esc(p.erro)}</div>`:`<p style="margin:0">Relatório do WMS importado: ${pl(p.novas.length+(p.incluirRecentes?p.recentes.length:0),"carga nova","cargas novas")} e ${pl(p.mud.length,"carga atualizada","cargas atualizadas")}.${p.novas.length?" As novas aparecem em <b>Aguardando envio e agenda</b>.":""}</p>`;
+  }
+  $("#modal").innerHTML=`<div class="modal"><div class="mbox" role="dialog" aria-modal="true" aria-label="Importar relatório do WMS"><div class="mw">
+    <div class="dhead"><div><span class="label">Importar relatório do WMS</span><h2>${esc(p.arquivo)}</h2><span class="small">Aba ${esc(p.aba)}. O WMS só avança o status das cargas e atualiza galpão, loja, roteirização e paletes. Envio, agenda e observação não mudam.</span></div>${p.fase!=="gravando"?`<button class="x" data-mclose="1" aria-label="Fechar">×</button>`:""}</div>
+    ${corpo}
+    <div class="mfoot">${p.fase==="previa"?`<button class="btn ghost" data-mclose="1">Cancelar</button><button class="btn" id="impok" ${total?"":"disabled"}>${total?`Confirmar importação (${total})`:"Nada para importar"}</button>`:p.fase==="fim"?`<button class="btn" data-mclose="1">Fechar</button>`:""}</div>
+  </div></div></div>`;
+}
+async function gravarWMS(){
+  const p=imp, now=new Date().toISOString(), por=meId||null; const tarefas=[];
+  const nova=(n)=>{const l=n.l;return ()=>db.collection("cargas").doc(n.id||docId("",l.carga)).set({envio:"",carga:l.carga,galpao:l.galpao,loja:l.loja,rot:l.rot,agenda:"",volume:l.volume,obs:"",status:n.cod,
+    hist:[{tipo:"status",de:null,para:n.cod,em:n.fato,reg:now,por,origem:"wms"}],criadoEm:now,atualizadoEm:now,atualizadoPor:por});};
+  p.novas.forEach(n=>tarefas.push(nova(n)));
+  if(p.incluirRecentes) p.recentes.forEach(n=>tarefas.push(nova(n)));
+  p.mud.forEach(m=>tarefas.push(()=>{const d=docs.get(m.id)||{};const ent=[];const patch={...m.camp};
+    Object.keys(m.camp).forEach(k=>ent.push({tipo:k,de:d[k]==null?"":d[k],para:m.camp[k]==null?"":m.camp[k],em:hojeIso(),reg:now,por,origem:"wms"}));
+    if(m.para!=null){patch.status=m.para;ent.push({tipo:"status",de:m.de,para:m.para,em:m.fato,reg:now,por,origem:"wms"});}
+    patch.hist=(Array.isArray(d.hist)?d.hist:[]).concat(ent);patch.atualizadoEm=now;patch.atualizadoPor=por;
+    return db.collection("cargas").doc(m.id).update(patch);}));
+  p.fase="gravando"; p.total=tarefas.length; p.feitos=0; renderImp();
+  let falhas=0, ult=null;
+  await emLotes(tarefas,4,async(fn)=>{try{await fn();}catch(e){falhas++;ult=e;}},(f)=>{p.feitos=f;renderImp();});
+  try{ await db.doc("meta/base").set({arquivo:p.arquivo+" (WMS)",em:now,por,novas:p.novas.length,atualizadas:p.mud.length,falhas}); }catch(e){}
+  if(tarefas.length) marcarSujo(true);
+  p.fase="fim"; if(falhas) p.erro=`${falhas} de ${tarefas.length} gravações falharam. ${erroTxt(ult)}`; renderImp(); sel.clear(); render();
+}
 function prever(arquivo,lp){
   const hoje=hojeN(); const probs=[]; const seen=new Map(); const novas=[], mud=[], atras=[], iguais=[];
   const P=(sev,l,t)=>probs.push({sev,linha:l.linha,carga:l.carga,t});
   lp.linhas.forEach(l=>{
     if(!l.carga){P("e",l,"Linha sem número de carga (ignorada).");return;}
-    const id=docId(l.envio,l.carga);
-    if(seen.has(id)){P("e",l,`Carga repetida no mesmo envio (já na linha ${seen.get(id)}); esta linha foi ignorada.`);return;}
+    const id=idPorCarga().get(l.carga)||docId(l.envio,l.carga);
+    if(seen.has(id)){P("e",l,`Carga repetida (já na linha ${seen.get(id)}); esta linha foi ignorada.`);return;}
     seen.set(id,l.linha);
     if(!/^\d{8}$/.test(l.carga)) P("w",l,`Número de carga fora do padrão de 8 dígitos (${l.carga}).`);
-    if(!/^\d{8}$/.test(l.envio)) P("w",l,`Número de envio fora do padrão de 8 dígitos (${l.envio}).`);
+    if(l.envio&&!/^\d{8}$/.test(l.envio)) P("w",l,`Número de envio fora do padrão de 8 dígitos (${l.envio}).`);
     if(l.agenda==="?"){P("e",l,"Data de agenda inválida (ficou em branco).");l.agenda="";}
     if(l.rot==="?"){P("w",l,"Data de roteirização inválida (ficou em branco).");l.rot="";}
-    if(!l.agenda) P("e",l,"Sem data de agenda: não dá para calcular o cronograma.");
+    if(!l.agenda) P("w",l,"Sem envio/agenda ainda: o cronograma é calculado depois de agendar.");
     if(l.agenda&&l.rot&&l.agenda<l.rot) P("e",l,"Agenda antes da roteirização.");
     if(lp.temGalpao&&!l.galpao) P("w",l,"Galpão em branco.");
     if(lp.temLoja&&!l.loja) P("w",l,"Loja destino em branco.");
     if(l.volume!=null&&isNaN(l.volume)){P("w",l,`Volume não numérico (${l.volRaw}); ignorado.`);l.volume=null;}
     let sc=codTexto(l.statusTxt);
     if(sc===undefined){P("w",l,`Status "${l.statusTxt}" não reconhecido; status atual mantido.`);sc=null;}
-    const ex0=docs.get(id); const hp=lp.hist&&lp.hist.get(id);
+    const ex0=docs.get(id); const hp=lp.hist&&lp.hist.get(l.carga);
     const ex=ex0&&modoLocal&&hp?{...ex0,hist:hp,status:ultimoStatus(hp)??ex0.status}:ex0;
     const histMudou=!!(ex0&&modoLocal&&hp&&JSON.stringify(hp)!==JSON.stringify(ex0.hist||[]));
     const ag=dayOf(l.agenda); const stFinal=sc!=null?sc:(ex?ex.status:(hp?ultimoStatus(hp)??1:1));
     if(ag!=null&&hoje>ag&&stFinal>=1&&stFinal<=5) P("w",l,`Agenda ${br(l.agenda)} já passou e a carga não está como Entregue.`);
     if(!ex){ const bh=hp||[]; novas.push({id,l,status:sc!=null?sc:(ultimoStatus(bh)??1),baseHist:bh}); return; }
-    const camp={}; [["galpao",l.galpao],["loja",l.loja],["rot",l.rot],["agenda",l.agenda],["obs",l.obs]].forEach(([k,v])=>{ if(k==="galpao"&&!lp.temGalpao) return; if(k==="loja"&&!lp.temLoja) return; if(String(v||"")!==String(ex[k]||"")) camp[k]=v; });
+    const camp={}; [["envio",l.envio],["galpao",l.galpao],["loja",l.loja],["rot",l.rot],["agenda",l.agenda],["obs",l.obs]].forEach(([k,v])=>{ if((k==="envio"||k==="agenda")&&!v) return; if(k==="galpao"&&!lp.temGalpao) return; if(k==="loja"&&!lp.temLoja) return; if(String(v||"")!==String(ex[k]||"")) camp[k]=v; });
     if(lp.temVolume){const ov=typeof ex.volume==="number"?ex.volume:null; if(l.volume!==ov) camp.volume=l.volume;}
     const at=typeof ex.status==="number"?ex.status:1; let st=null;
     if(sc!=null&&sc!==at){ if(POS(sc)>POS(at)) st=sc; else atras.push({id,l,de:at,para:sc,baseHist:ex.hist||[]}); }
@@ -1088,6 +1215,7 @@ function prever(arquivo,lp){
 }
 function renderImp(){
   if(!imp){$("#modal").innerHTML="";return;}
+  if(imp.tipo==="wms") return renderImpWMS();
   const p=imp, ne=p.probs.filter(x=>x.sev==="e").length, nw=p.probs.length-ne;
   const nStatus=p.mud.filter(m=>m.para!=null).length+(p.aplicarAtras?p.atras.length:0);
   const linhaMud=(m)=>{const parts=[];if(m.histMudou&&m.para==null&&!Object.keys(m.camp).length)parts.push("histórico atualizado pela planilha");if(m.para!=null)parts.push(`${ST[m.de].nome} → <b>${ST[m.para].nome}</b>`);Object.entries(m.camp).forEach(([k,v])=>{const n={galpao:"galpão",loja:"loja",rot:"roteirização",agenda:"agenda",obs:"obs.",volume:"volume"}[k];parts.push(`${n}: ${k==="agenda"||k==="rot"?br(v):esc(v===null?"—":v)||"—"}`);});return `<li><span class="mono"><b>${esc(m.l.carga)}</b></span><span>${parts.join(" · ")}</span></li>`;};
@@ -1115,6 +1243,7 @@ function renderImp(){
   </div></div></div>`;
 }
 async function gravarImp(){
+  if(imp&&imp.tipo==="wms") return gravarWMS();
   const p=imp, now=new Date().toISOString(), por=meId||null, em=p.em||hojeIso();
   const tarefas=[];
   p.novas.forEach(n=>{const l=n.l;const bh=n.baseHist||[];const ult=ultimoStatus(bh);
@@ -1143,7 +1272,7 @@ async function carregar(file){
     if(!loaded) throw new Error("Aguarde as cargas do painel terminarem de carregar.");
     const lp=lerPlanilha(await file.arrayBuffer());
     if(!lp.linhas.length) throw new Error("A planilha não tem cargas abaixo do cabeçalho.");
-    imp=prever(file.name,lp); toast=""; clearTimeout(toastT); render(); renderImp();
+    imp=lp.tipo==="wms"?preverWMS(file.name,lp):prever(file.name,lp); toast=""; clearTimeout(toastT); render(); renderImp();
   }catch(e){ setToast(e.message||"Não consegui ler esse arquivo.",true); }
 }
 
@@ -1212,6 +1341,7 @@ document.addEventListener("click",e=>{
   if(t.closest("#limpar")){sel.clear();render();return;}
   if(t.closest("#exportar")){exportarSel();return;}
   if(t.closest("#bapl")){aplicarLote();return;}
+  if(t.closest("#bagd")){aplicarAgenda();return;}
   if(t.closest("#baixar")){baixarBase();return;}
   if(t.closest("#exphtml")){exportarHTML();return;}
   if(t.closest("#resumo")){copiarResumo();return;}
@@ -1235,15 +1365,18 @@ document.addEventListener("change",e=>{
   if(t.id==="kpimes"){kpiMes=t.value;render();return;}
   if(t.id==="bst"){bulkSt=t.value;return;}
   if(t.id==="bdt"){bulkData=t.value;return;}
+  if(t.id==="bag"){bulkAgenda=t.value;return;}
   if(t.id==="impatras"&&imp){imp.aplicarAtras=t.checked;renderImp();return;}
   if(t.id==="impfora"&&imp){imp.removerFora=t.checked;renderImp();return;}
+  if(t.id==="imprec"&&imp){imp.incluirRecentes=t.checked;renderImp();return;}
   if(t.id==="impregras"&&imp){imp.aplicarRegras=t.checked;renderImp();return;}
   if(t.id==="impem"&&imp){imp.em=t.value;return;}
 });
 document.addEventListener("input",e=>{
-  const t=e.target; if(!dForm&&t.id!=="busca") return;
-  const map={dem:"em",dag:"agenda",dga:"galpao",dlj:"loja",dro:"rot",dvo:"volume",dob:"obs"};
+  const t=e.target; if(!dForm&&t.id!=="busca"&&t.id!=="ben") return;
+  const map={dem:"em",den:"envio",dag:"agenda",dga:"galpao",dlj:"loja",dro:"rot",dvo:"volume",dob:"obs"};
   if(map[t.id]&&dForm){dForm[map[t.id]]=t.value;return;}
+  if(t.id==="ben"){bulkEnvio=t.value;return;}
   if(t.id==="busca"){busca=t.value;const pos=t.selectionStart;render();const b=$("#busca");if(b){b.focus();try{b.setSelectionRange(pos,pos);}catch(_){}}}
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(imp&&imp.fase!=="gravando"){imp=null;$("#modal").innerHTML="";}else if(cfgOpen){cfgOpen=false;renderCfg();}else if(openId)fechar();}});
