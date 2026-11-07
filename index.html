@@ -999,8 +999,9 @@ function toISO(v){
 function idPorCarga(){const m=new Map();docs.forEach((d,id)=>{if(d&&d.carga!=null)m.set(String(d.carga),id);});return m;}
 /* Status das ordens no Infor WMS → status do painel (a confirmar com a operação: 02 e 95 já vistos no relatório) */
 const WMS_ST={"00":["Vazia",1],"02":["Criada (integração)",1],"04":["Criada internamente",1],"06":["Não iniciada",1],"08":["Convertida",1],"09":["Não iniciada",1],
-  "11":["Parcialmente pré-alocada",2],"12":["Pré-alocada",2],"13":["Parcialmente alocada",2],"14":["Parcialmente alocada",2],"15":["Alocada / separada parcial",3],"17":["Alocada",2],"19":["Substituída",2],
-  "22":["Parcialmente liberada",2],"25":["Liberada / separada parcial",3],"29":["Liberada",2],
+  /* alocada / liberada: status operacionais da produção — não mudam o status do painel */
+  "11":["Parcialmente pré-alocada",null],"12":["Pré-alocada",null],"13":["Parcialmente alocada",null],"14":["Parcialmente alocada",null],"15":["Alocada / separada parcial",3],"17":["Alocada",null],"19":["Substituída",null],
+  "22":["Parcialmente liberada",null],"25":["Liberada / separada parcial",3],"29":["Liberada",null],
   "51":["Em separação",3],"52":["Separada parcialmente",3],"55":["Separação completa",4],
   "61":["Em embalagem",4],"68":["Embalagem completa",4],"75":["Em preparação de doca",4],"82":["Em carregamento",4],"88":["Carregada",4],
   "16":["Alocada / expedida parcial",5],"27":["Liberada / expedida parcial",5],"53":["Separada / expedida parcial",5],"57":["Separada / expedida parcial",5],"92":["Expedida parcialmente",5],"94":["Expedida",5],"95":["Expedida completa",5],
@@ -1112,9 +1113,11 @@ function preverWMS(arquivo,lp){
     if(seen.has(l.carga)) return; seen.add(l.carga);
     const w=WMS_ST[l.wms]; const k=resumo.get(l.wms)||{n:0,nome:w?w[0]:"Não reconhecido",para:w?w[1]:null}; k.n++; resumo.set(l.wms,k);
     if(!w){desconhecidos.set(l.wms,(desconhecidos.get(l.wms)||0)+1);}
+    const operacional=!!(w&&w[1]==null);
     const cod=w?w[1]:null; const fato=(cod===5||cod===6)&&l.exp?l.exp:(l.edit||hojeIso());
     const id=mapa.get(l.carga); const ex=id?docs.get(id):null;
     if(!ex){
+      if(operacional){ novas.push({id:docId("",l.carga),l,cod:1,fato:l.edit||hojeIso()}); return; }
       if(cod==null) return;
       if(cod>=5||cod===0){ ignoradas.push(l); if(cod===5&&l.exp&&uteisEntre(dayOf(l.exp),hoje)<=DIAS_EXP_RECENTE) recentes.push({l,cod,fato}); return; }
       novas.push({id:docId("",l.carga),l,cod,fato}); return;
@@ -1139,7 +1142,7 @@ function renderImpWMS(){
     corpo=`<div class="sumg"><div><span class="label">Novas</span><b>${p.novas.length}</b></div><div><span class="label">Atualizadas</span><b>${p.mud.length}</b></div><div><span class="label">Sem mudança</span><b>${p.iguais.length}</b></div><div><span class="label">Ignoradas</span><b>${p.ignoradas.length}</b></div></div>
       <p class="small" style="margin:0">Relatório do <b>WMS</b> reconhecido. Usei só ${p.usadas.length} das ${p.totalColunas} colunas: ${p.usadas.map(k=>WMS_COLS[k]).join(", ")}. O resto é ignorado.</p>
       <section style="display:grid;gap:6px"><span class="label">Status do WMS neste arquivo</span><div style="overflow-x:auto"><table class="s"><thead><tr><th>WMS</th><th>Situação no WMS</th><th>Vira no painel</th><th class="num">Cargas</th></tr></thead><tbody>
-        ${p.resumo.map(([c,x])=>`<tr><td class="mono">${esc(c)}</td><td>${esc(x.nome)}</td><td>${x.para==null?'<span style="color:var(--crit)">não reconhecido, status mantido</span>':`<span class="pill" style="${cv(x.para)}">${ST[x.para].nome}</span>`}</td><td class="num mono">${x.n}</td></tr>`).join("")}
+        ${p.resumo.map(([c,x])=>`<tr><td class="mono">${esc(c)}</td><td>${esc(x.nome)}</td><td>${x.para==null?(WMS_ST[c]?'<span class="small">status operacional · não muda o painel</span>':'<span style="color:var(--crit)">não reconhecido, status mantido</span>'):`<span class="pill" style="${cv(x.para)}">${ST[x.para].nome}</span>`}</td><td class="num mono">${x.n}</td></tr>`).join("")}
       </tbody></table></div></section>
       ${p.mud.length?`<section style="display:grid;gap:6px"><span class="label">Atualizações em cargas do painel</span><ul class="plist">${p.mud.map(linhaMud).join("")}</ul></section>`:""}
       ${p.novas.length?`<section style="display:grid;gap:6px"><span class="label">Cargas novas (entram como ${nomeSt(1)}, sem envio e agenda)</span><ul class="plist">${p.novas.map(n=>`<li><span class="mono"><b>${esc(n.l.carga)}</b></span><span>${esc(n.l.galpao)||"sem galpão"} · loja ${esc(n.l.loja)||"—"} · ${n.l.volume!=null?fmtN(n.l.volume)+" paletes":"—"} · roteirizada em ${br(n.l.rot)}</span></li>`).join("")}</ul><span class="small">Depois de agendar no portal do Mercado Livre, informe o envio e a agenda no painel: marque as cargas e use <b>Agendar</b>.</span></section>`:""}
