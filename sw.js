@@ -1,5 +1,5 @@
 // Painel de Cargas — funciona sem internet depois de instalado
-const VERSAO="painel-cargas-c0368c37c0";
+const VERSAO="painel-cargas-51639553f0";
 const ARQUIVOS=["./","./index.html","./manifest.webmanifest","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./apple-touch-icon.png","./favicon.png"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(VERSAO).then(c=>c.addAll(ARQUIVOS)));});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==VERSAO&&k!=="painel-fontes").map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});

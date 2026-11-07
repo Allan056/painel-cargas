@@ -33,13 +33,13 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#11161c; --surface:#19212a; --fg:#e6ebf0; --muted:#97a4b1; --line:#2b3642; --accent:#5ea2ec; --accent-fg:#0d1620; --hover:#202a35;
   --band:#0b1016; --band-fg:#e6ebf0; --band-muted:#8d9aa7; --band-card:#18212b; --band-line:#2b3642;
-  --s1:#9aa6b2; --s2:#5ea2ec; --s3:#a585ec; --s4:#3cc0b9; --s5:#e8b53d; --s6:#4cc083; --s0:#9a9a9a;
+  --solo-tx:#0f141a; --s1:#9aa6b2; --s2:#5ea2ec; --s3:#a585ec; --s4:#3cc0b9; --s5:#e8b53d; --s6:#4cc083; --s0:#9a9a9a;
   --s1-bg:#232c36; --s2-bg:#18304a; --s3-bg:#2a2244; --s4-bg:#123634; --s5-bg:#3a2f14; --s6-bg:#173525; --s0-bg:#2a2a2a;
   --crit:#ef5b5b; --high:#f08a4b; --warn:#e8b53d; --ok:#4cc083; --crit-bg:#3f1d1d; --warn-bg:#3a2f14; --sel-bg:#18304a; --shade:rgba(0,0,0,.6); color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#11161c; --surface:#19212a; --fg:#e6ebf0; --muted:#97a4b1; --line:#2b3642; --accent:#5ea2ec; --accent-fg:#0d1620; --hover:#202a35;
   --band:#0b1016; --band-fg:#e6ebf0; --band-muted:#8d9aa7; --band-card:#18212b; --band-line:#2b3642;
-  --s1:#9aa6b2; --s2:#5ea2ec; --s3:#a585ec; --s4:#3cc0b9; --s5:#e8b53d; --s6:#4cc083; --s0:#9a9a9a;
+  --solo-tx:#0f141a; --s1:#9aa6b2; --s2:#5ea2ec; --s3:#a585ec; --s4:#3cc0b9; --s5:#e8b53d; --s6:#4cc083; --s0:#9a9a9a;
   --s1-bg:#232c36; --s2-bg:#18304a; --s3-bg:#2a2244; --s4-bg:#123634; --s5-bg:#3a2f14; --s6-bg:#173525; --s0-bg:#2a2a2a;
   --crit:#ef5b5b; --high:#f08a4b; --warn:#e8b53d; --ok:#4cc083; --crit-bg:#3f1d1d; --warn-bg:#3a2f14; --sel-bg:#18304a; --shade:rgba(0,0,0,.6); color-scheme:dark}
 :root[data-visual="claro"]{
@@ -190,7 +190,7 @@ footer{font-size:12px;color:var(--muted);display:grid;gap:4px}
 .cc:hover{filter:brightness(.97)}
 .cc:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .cj{display:inline-flex;align-items:center;gap:4px;font-family:var(--body);font-size:11px;font-weight:700;color:#fff;background:var(--cj);border-radius:3px;padding:0 5px;align-self:flex-start;white-space:nowrap;line-height:17px}
-.cj.solo{background:#4c5566;color:#fff}
+.cj.solo{background:var(--c,#4c5566);color:var(--solo-tx,#fff)}
 .cc.hl{outline:2px solid var(--cj);outline-offset:1px}
 .cal.foco .cc:not(.hl),.mcal.foco .cc:not(.hl){opacity:.3}
 .mcal{display:grid;grid-template-columns:repeat(5,minmax(124px,1fr)) repeat(2,minmax(84px,.6fr));min-width:820px}
@@ -677,7 +677,7 @@ function vCalendario(){
         const gs=[...new Set(l.map(r=>r.galpao||"sem galpão"))], ds=[...new Set(l.map(r=>dateOf(r)).filter(Boolean))].sort(), sts=[...new Set(l.map(r=>r.cod))];
         const avisos=[]; if(ds.length>1) avisos.push("datas diferentes"); if(sts.length>1) avisos.push("status diferentes");
         return `<div class="cjitem" data-env="${esc(e)}" style="--cj:var(--cj${cor.get(e)})"><span>⛓ Envio <b>${esc(e)}</b> · ${pl(l.length,"carga")}${sumVol(l)}</span><span class="small">${l.map(r=>esc(r.carga)).join(" + ")}</span><span class="small">${gs.length>1?"Galpões "+gs.map(esc).join(" + "):"Galpão "+esc(gs[0])} · ${ds.map(d=>br(d)).join(", ")||"sem data"}${avisos.length?` · <span class="w">${avisos.join(", ")}</span>`:""}</span></div>`;}).join("")}</div></section>`;})()}
-    <div class="legend">${ORDEM.filter(c=>c!==0).map(c=>`<span style="${cv(c)}"><span class="dot"></span>${ST[c].nome}</span>`).join("")}<span><span class="dot" style="--c:var(--crit)"></span>bolinha = alerta (atrasada, risco, atenção)</span><span><span class="cj" style="--cj:var(--cj1)">⛓ envio · 1/2</span>carga conjugada: número do envio e posição dela no envio</span><span><span class="cj solo">envio · 1/1</span>carga sozinha no envio</span>${calVista==="mes"?`<span>no mês o número do envio aparece ao passar o mouse</span>`:""}</div>
+    <div class="legend">${ORDEM.filter(c=>c!==0).map(c=>`<span style="${cv(c)}"><span class="dot"></span>${ST[c].nome}</span>`).join("")}<span><span class="dot" style="--c:var(--crit)"></span>bolinha = alerta (atrasada, risco, atenção)</span><span><span class="cj" style="--cj:var(--cj1)">⛓ envio · 1/2</span>carga conjugada: número do envio e posição dela no envio</span><span><span class="cj solo" style="--c:var(--s2)">envio · 1/1</span>carga sozinha no envio (na cor do status)</span>${calVista==="mes"?`<span>no mês o número do envio aparece ao passar o mouse</span>`:""}</div>
     <footer><div>${calModo==="cron"?"Cada carga aparece no dia limite para entrar no cronograma (agenda − "+cfg.regraDias+" d.u.). \"a incluir\" = ainda aguardando cronograma.":"Cada carga aparece no dia da agenda de entrega no Mercado Livre."} Clique numa carga para ver detalhes e mudar o status.${calVista==="mes"?" Clique no dia para abrir a semana dele.":""} Paletes aparecem quando a coluna PALETES está preenchida na base.</div></footer>
   </div>`;
 }
