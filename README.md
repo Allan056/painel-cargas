@@ -45,7 +45,7 @@ Antes, o controle era feito direto na planilha, sem uma visão clara de **qual c
 | 🗓️ | **Calendário** | Visão semanal e mensal por galpão, com as **cargas conjugadas** destacadas |
 | 📈 | **Indicadores** | % no prazo do cronograma, % entregue na agenda e tempo médio por etapa |
 | 🔎 | **Filtros e busca** | Por galpão, loja destino, status, carga ou envio |
-| 📥 | **Importação do WMS** | Lê o relatório de cargas do Infor WMS, cria as cargas novas e avança o status sozinho (ex.: expedida) |
+| 📥 | **Importação do WMS** | Lê o relatório de cargas do Infor WMS, cria as cargas novas e avança o status sozinho (ex.: produzida, expedida) |
 | 🗓️ | **Agendar em lote** | Informa o envio e a data de agenda do portal ML para várias cargas de uma vez |
 | ✅ | **Conferência da base** | Ao carregar a planilha, mostra problemas e o que vai mudar antes de gravar |
 | 📤 | **Exportação para Excel** | Cargas selecionadas ou a base completa, com histórico e regras |
@@ -126,6 +126,8 @@ Depois de instalado, o painel abre como um aplicativo e **funciona sem internet*
 4. Clique em **Baixar base** e salve a planilha na pasta da equipe
 
 > 📥 Do relatório do WMS, o painel usa só o necessário: nº da ordem (carga), data da ordem (roteirização), galpão, receptor (loja destino), estimativa de paletes, status e data real de expedição.
+
+> 🚚 No Infor, **Expedida** quer dizer produção finalizada: no painel a carga vira **Produzida**. A expedição de fato é na **véspera da agenda**, porque a entrega no Mercado Livre é na madrugada do dia agendado. A partir desse dia, o WMS passa a carga para **Expedida**.
 
 ---
 

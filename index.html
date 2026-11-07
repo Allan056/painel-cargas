@@ -412,10 +412,13 @@ function calc(id,d,hoje){
   const rf=lim==null?null:menosUteis(lim,cfg.rfDias);
   const duRf=rf==null?null:uteisEntre(hoje,rf);
   const duAg=ag==null?null:uteisEntre(hoje,ag);
+  const ex=ag==null?null:ag-1; /* expedição: véspera da agenda (entrega na madrugada do dia agendado) */
   let alerta="No prazo",nivel="ok",acao="";
   if(cod===6||cod===0){alerta="Encerrada";nivel="none";}
   else if(ag==null){alerta="Sem agenda";nivel="high";acao="Agendar no portal ML";}
-  else if(hoje>ag){alerta="Entrega atrasada";nivel="crit";acao="Cobrar entrega / reagendar";}
+  else if(cod===5){if(hoje>=ag){alerta="Confirmar entrega";nivel="warn";acao="Confirmar recebimento na loja";}else acao="Acompanhar entrega";}
+  else if(cod>1&&hoje>ex){alerta="Expedição atrasada";nivel="crit";acao="Expedir / reagendar no portal ML";}
+  else if(cod===1&&hoje>ag){alerta="Entrega atrasada";nivel="crit";acao="Reagendar no portal ML";}
   else if(cod===1){
     acao="Incluir no cronograma";
     if(hoje>lim){alerta="Fora do prazo do cronograma";nivel="crit";}
@@ -424,15 +427,15 @@ function calc(id,d,hoje){
     else if(hoje<rf){if(duRf<=cfg.atencaoDias){alerta="Atenção";nivel="warn";}}
     else if(duLim<=cfg.atencaoDias){alerta="Atenção";nivel="warn";}
   }
-  else if(hoje===ag){alerta="Entrega hoje";nivel="high";acao=cod===5?"Confirmar entrega":"Expedir hoje";}
-  else if(cod<=3&&duAg<=1){alerta="Risco de atraso";nivel="high";acao=cod===2?"Iniciar produção":"Finalizar produção";}
-  else{acao={2:"Produzir",3:"Acompanhar produção",4:"Expedir",5:"Acompanhar entrega"}[cod]||"";}
+  else if(hoje===ex){alerta="Expedir hoje";nivel="high";acao=cod===4?"Expedir hoje":"Finalizar produção e expedir hoje";}
+  else if(cod<=3&&uteisEntre(hoje,ex)<=1){alerta="Risco de atraso";nivel="high";acao=cod===2?"Iniciar produção":"Finalizar produção";}
+  else{acao={2:"Produzir",3:"Acompanhar produção",4:"Expedir em "+br(isoOf(ex))}[cod]||"";}
   const rank={crit:0,high:1,warn:2,ok:3,none:9}[nivel];
   const ref=cod===1?lim:ag;
   const hist=Array.isArray(d.hist)?d.hist:[];
   return {id,envio:String(d.envio||""),carga:String(d.carga||""),galpao:String(d.galpao||""),loja:String(d.loja==null?"":d.loja),rot:d.rot||"",agenda:d.agenda||"",volume:(typeof d.volume==="number"?d.volume:null),obs:d.obs||"",
     cod,hist,atualizadoEm:d.atualizadoEm||"",atualizadoPor:d.atualizadoPor||null,
-    lim:lim==null?"":isoOf(lim),duLim,rf:rf==null?"":isoOf(rf),duRf,duAg,alerta,nivel,acao,key:rank*1e6+(ref==null?99999:ref)};
+    lim:lim==null?"":isoOf(lim),duLim,exp:ex==null?"":isoOf(ex),rf:rf==null?"":isoOf(rf),duRf,duAg,alerta,nivel,acao,key:rank*1e6+(ref==null?99999:ref)};
 }
 const prazoTxt=(du)=>du==null?"—":du<0?`${-du} d.u. atrasado`:du===0?"hoje":`em ${du} d.u.`;
 const aberta=(r)=>r.cod>=1&&r.cod<=5;
@@ -532,7 +535,7 @@ function vPainel(){
   const hc=first?(first.nivel==="ok"?"--accent":AL[first.nivel]):"--ok";
   const hero=first?`<div class="hero" style="--hc:var(${hc})">
       <div class="hh"><span class="label">Próxima${grupo.length>1?"s":""} carga${grupo.length>1?"s":""} para produção</span>
-      <span class="d">Informar R.F. ${br(first.rf)} (${wdS(first.rf)}) · Cronograma até ${br(first.lim)} (${wdS(first.lim)}) · Agenda ${br(first.agenda)} (${wdS(first.agenda)}) · ${pl(grupo.length,"carga")}${sumVol(grupo)}</span></div>
+      <span class="d">Informar R.F. ${br(first.rf)} (${wdS(first.rf)}) · Cronograma até ${br(first.lim)} (${wdS(first.lim)}) · Expedição ${br(first.exp)} (${wdS(first.exp)}) · Agenda ${br(first.agenda)} (${wdS(first.agenda)}) · ${pl(grupo.length,"carga")}${sumVol(grupo)}</span></div>
       <div class="hbox"><table class="ht"><thead><tr><th></th><th>Carga</th><th>Envio</th><th>Galpão</th><th>Loja</th><th>Status</th><th>Informar R.F.</th><th>Cronograma até</th><th>Agenda ML</th></tr></thead><tbody>
       ${grupo.map(r=>`<tr><td style="width:16px">${ckb(r.id)}</td><td class="big">${cgBtn(r)}</td><td class="mono">${esc(r.envio)||"—"}</td><td>${esc(r.galpao)||"—"}</td><td>${esc(r.loja)||"—"}</td><td>${ST[r.cod].nome}</td><td class="mono">${br(r.rf)}${r.cod===1?" · "+prazoTxt(r.duRf):""}</td><td class="mono">${br(r.lim)} · ${prazoTxt(r.duLim)}</td><td class="mono">${br(r.agenda)} · ${prazoTxt(r.duAg)}</td></tr>`).join("")}
       </tbody></table></div></div>`
@@ -593,7 +596,7 @@ function vPainel(){
         <div class="tablebox"><table class="t"><thead><tr><th class="w"><input type="checkbox" id="selall" ${visAll?"checked":""} ${visSome&&!visAll?'data-ind="1"':""} aria-label="Selecionar todas desta visão"></th><th>Envio</th><th>Carga</th><th>Galpão</th><th>Loja</th><th>Status</th><th>Roteirização</th><th>Informar R.F.</th><th>Cronograma até</th><th>Agenda ML</th><th class="num">Paletes</th><th>Ação</th><th>Alerta</th><th>Obs.</th></tr></thead>
         <tbody>${vis.length?vis.map(trow).join(""):`<tr><td colspan="14" class="empty">Nenhuma carga nesta visão.</td></tr>`}</tbody></table></div>
       </section>
-      <footer><div>"Cronograma até" é calculado: agenda menos ${pl(cfg.regraDias,"dia útil","dias úteis")}. "Informar R.F." é ${pl(cfg.rfDias,"dia útil","dias úteis")} antes do cronograma. Dias úteis sem sábados, domingos e feriados${cfg.feriadosExtras.length?" (nacionais + "+cfg.feriadosExtras.length+" cadastrados)":" nacionais"}.</div>
+      <footer><div>"Cronograma até" é calculado: agenda menos ${pl(cfg.regraDias,"dia útil","dias úteis")}. "Informar R.F." é ${pl(cfg.rfDias,"dia útil","dias úteis")} antes do cronograma. A expedição é na véspera da agenda, porque a entrega é na madrugada do dia agendado. Dias úteis sem sábados, domingos e feriados${cfg.feriadosExtras.length?" (nacionais + "+cfg.feriadosExtras.length+" cadastrados)":" nacionais"}.</div>
       <div>${modoLocal?"Os dados ficam guardados neste navegador. Mudou status por aqui? Clique em Baixar base e salve a planilha na pasta da equipe: ela leva o histórico e as regras, e quem carregar essa planilha vê tudo igual.":"As mudanças de status feitas aqui ficam salvas para toda a equipe e entram no histórico de cada carga."} Marque cargas para exportar ou mudar o status de várias de uma vez.</div></footer>
     </div>`;
 }
@@ -774,6 +777,7 @@ function renderDrawerInfo(){
       <div><span class="label">Loja destino</span><span class="v mono">${esc(r.loja)||"—"}</span></div>
       <div><span class="label">Informar R.F.</span><span class="v mono">${brA(r.rf)} ${wdS(r.rf)}${r.cod===1?" · "+prazoTxt(r.duRf):""}</span></div>
       <div><span class="label">Cronograma até</span><span class="v mono">${brA(r.lim)} ${wdS(r.lim)}${r.cod===1?" · "+prazoTxt(r.duLim):""}</span></div>
+      <div><span class="label">Expedição (véspera da agenda)</span><span class="v mono">${r.exp?brA(r.exp)+" "+wdS(r.exp):"—"}</span></div>
       <div><span class="label">Agenda ML</span><span class="v mono">${brA(r.agenda)} ${wdS(r.agenda)}${aberta(r)?" · "+prazoTxt(r.duAg):""}</span></div>
       <div><span class="label">Roteirização</span><span class="v mono">${brA(r.rot)}</span></div>
       <div><span class="label">Paletes</span><span class="v mono">${r.volume!=null?fmtN(r.volume):"—"}</span></div>
@@ -972,10 +976,10 @@ function resumo(){
   const rfHoje=ab.filter(r=>r.cod===1&&r.duRf===0&&r.duLim>0);
   const incluirHoje=ab.filter(r=>r.cod===1&&r.duLim===0), vencido=ab.filter(r=>r.cod===1&&r.duLim!=null&&r.duLim<0);
   const prox=ab.filter(r=>r.cod===1&&r.duLim>0&&r.duLim<=cfg.atencaoDias);
-  const risco=ab.filter(r=>r.alerta==="Risco de atraso"), entHoje=ab.filter(r=>r.alerta==="Entrega hoje"), atras=ab.filter(r=>r.alerta==="Entrega atrasada");
+  const risco=ab.filter(r=>r.alerta==="Risco de atraso"), expHoje=ab.filter(r=>r.alerta==="Expedir hoje"), atras=ab.filter(r=>r.alerta==="Expedição atrasada"||r.alerta==="Entrega atrasada"), confEnt=ab.filter(r=>r.alerta==="Confirmar entrega");
   const emProd=ab.filter(r=>r.cod===3), aProd=ab.filter(r=>r.cod===2);
   let t=`*Painel de Cargas · ${brA(hojeIso())} (${wd(hoje)})*${galpaoF?" · "+(galpaoF==="__sem"?"sem galpão":"Galpão "+galpaoF):""}`;
-  t+=bloco("Fora do prazo do cronograma",vencido)+bloco("Informar R.F. hoje",rfHoje)+bloco("Incluir no cronograma hoje",incluirHoje)+bloco(`Incluir nos próximos ${cfg.atencaoDias} d.u.`,prox)+bloco("Entrega atrasada",atras)+bloco("Entrega hoje",entHoje)+bloco("Risco de atraso",risco);
+  t+=bloco("Fora do prazo do cronograma",vencido)+bloco("Informar R.F. hoje",rfHoje)+bloco("Incluir no cronograma hoje",incluirHoje)+bloco(`Incluir nos próximos ${cfg.atencaoDias} d.u.`,prox)+bloco("Expedição atrasada",atras)+bloco("Expedir hoje",expHoje)+bloco("Risco de atraso",risco)+bloco("Confirmar entrega",confEnt);
   t+=`\n\nEm produção: ${emProd.length} · Próximas a produzir: ${aProd.length} · Aguardando cronograma: ${ab.filter(r=>r.cod===1).length} · Em aberto: ${ab.length}`;
   if(!vencido.length&&!incluirHoje.length&&!atras.length&&!entHoje.length&&!risco.length) t+="\nSem pendências críticas hoje.";
   return t;
@@ -997,14 +1001,16 @@ function toISO(v){
   return "?";
 }
 function idPorCarga(){const m=new Map();docs.forEach((d,id)=>{if(d&&d.carga!=null)m.set(String(d.carga),id);});return m;}
-/* Status das ordens no Infor WMS → status do painel (a confirmar com a operação: 02 e 95 já vistos no relatório) */
+/* Status das ordens no Infor WMS → status do painel */
 const WMS_ST={"00":["Vazia",1],"02":["Criada (integração)",1],"04":["Criada internamente",1],"06":["Não iniciada",1],"08":["Convertida",1],"09":["Não iniciada",1],
   /* alocada / liberada: status operacionais da produção — não mudam o status do painel */
   "11":["Parcialmente pré-alocada",null],"12":["Pré-alocada",null],"13":["Parcialmente alocada",null],"14":["Parcialmente alocada",null],"15":["Alocada / separada parcial",3],"17":["Alocada",null],"19":["Substituída",null],
   "22":["Parcialmente liberada",null],"25":["Liberada / separada parcial",3],"29":["Liberada",null],
   "51":["Em separação",3],"52":["Separada parcialmente",3],"55":["Separação completa",4],
   "61":["Em embalagem",4],"68":["Embalagem completa",4],"75":["Em preparação de doca",4],"82":["Em carregamento",4],"88":["Carregada",4],
-  "16":["Alocada / expedida parcial",5],"27":["Liberada / expedida parcial",5],"53":["Separada / expedida parcial",5],"57":["Separada / expedida parcial",5],"92":["Expedida parcialmente",5],"94":["Expedida",5],"95":["Expedida completa",5],
+  "16":["Alocada / expedida parcial",3],"27":["Liberada / expedida parcial",3],"53":["Separada / expedida parcial",3],"57":["Separada / expedida parcial",3],"92":["Expedida parcialmente",3],
+  /* no Infor, "expedida" = produção finalizada. A expedição de fato é na véspera da agenda: a partir desse dia a carga passa a Expedida */
+  "94":["Expedida (produção finalizada)",4,"fim"],"95":["Expedida completa (produção finalizada)",4,"fim"],
   "96":["Entregue",6],"98":["Cancelada externamente",0],"99":["Cancelada internamente",0]};
 const WMS_COLS={ORDERKEY:"Nº da ordem (carga)",ORDERDATE:"Data da ordem (roteirização)",EXT_UDF_LKUP1:"Lista de códigos CDU 1 (galpão)",CONSIGNEEKEY:"Receptor (loja destino)",TOTALPALLETESTIMATE:"Estimativa de palete total",STATUS:"Status",ACTUALSHIPDATE:"Data real de expedição",EDITDATE:"Data da atualização"};
 function lerWMS(nome,a,hi){
@@ -1114,12 +1120,15 @@ function preverWMS(arquivo,lp){
     const w=WMS_ST[l.wms]; const k=resumo.get(l.wms)||{n:0,nome:w?w[0]:"Não reconhecido",para:w?w[1]:null}; k.n++; resumo.set(l.wms,k);
     if(!w){desconhecidos.set(l.wms,(desconhecidos.get(l.wms)||0)+1);}
     const operacional=!!(w&&w[1]==null);
-    const cod=w?w[1]:null; const fato=(cod===5||cod===6)&&l.exp?l.exp:(l.edit||hojeIso());
+    const fim=!!(w&&w[2]==="fim");
+    let cod=w?w[1]:null; let fato=(fim||cod===6)&&l.exp?l.exp:(l.edit||hojeIso());
     const id=mapa.get(l.carga); const ex=id?docs.get(id):null;
+    /* produção finalizada + já chegou a véspera da agenda → Expedida, na data da véspera */
+    if(fim&&ex){const ag=dayOf(ex.agenda); if(ag!=null&&hoje>=ag-1){cod=5;fato=isoOf(ag-1);}}
     if(!ex){
       if(operacional){ novas.push({id:docId("",l.carga),l,cod:1,fato:l.edit||hojeIso()}); return; }
       if(cod==null) return;
-      if(cod>=5||cod===0){ ignoradas.push(l); if(cod===5&&l.exp&&uteisEntre(dayOf(l.exp),hoje)<=DIAS_EXP_RECENTE) recentes.push({l,cod,fato}); return; }
+      if(fim||cod>=5||cod===0){ ignoradas.push(l); if(fim&&l.exp&&uteisEntre(dayOf(l.exp),hoje)<=DIAS_EXP_RECENTE) recentes.push({l,cod,fato}); return; }
       novas.push({id:docId("",l.carga),l,cod,fato}); return;
     }
     const camp={}; [["galpao",l.galpao],["loja",l.loja],["rot",l.rot]].forEach(([k,v])=>{if(v&&String(v)!==String(ex[k]||""))camp[k]=v;});
@@ -1146,8 +1155,8 @@ function renderImpWMS(){
       </tbody></table></div></section>
       ${p.mud.length?`<section style="display:grid;gap:6px"><span class="label">Atualizações em cargas do painel</span><ul class="plist">${p.mud.map(linhaMud).join("")}</ul></section>`:""}
       ${p.novas.length?`<section style="display:grid;gap:6px"><span class="label">Cargas novas (entram como ${nomeSt(1)}, sem envio e agenda)</span><ul class="plist">${p.novas.map(n=>`<li><span class="mono"><b>${esc(n.l.carga)}</b></span><span>${esc(n.l.galpao)||"sem galpão"} · loja ${esc(n.l.loja)||"—"} · ${n.l.volume!=null?fmtN(n.l.volume)+" paletes":"—"} · roteirizada em ${br(n.l.rot)}</span></li>`).join("")}</ul><span class="small">Depois de agendar no portal do Mercado Livre, informe o envio e a agenda no painel: marque as cargas e use <b>Agendar</b>.</span></section>`:""}
-      ${p.ignoradas.length?`<p class="small" style="margin:0">${pl(p.ignoradas.length,"carga já expedida ou cancelada que não está no painel foi ignorada","cargas já expedidas ou canceladas que não estão no painel foram ignoradas")} (histórico do WMS).</p>`:""}
-      ${p.recentes.length?`<label class="ck small"><input type="checkbox" id="imprec" ${p.incluirRecentes?"checked":""}>Incluir mesmo assim as ${p.recentes.length} expedidas nos últimos ${DIAS_EXP_RECENTE} dias úteis (entram como Expedida, sem envio e agenda)</label>`:""}
+      ${p.ignoradas.length?`<p class="small" style="margin:0">${pl(p.ignoradas.length,"carga já finalizada ou cancelada que não está no painel foi ignorada","cargas já finalizadas ou canceladas que não estão no painel foram ignoradas")} (histórico do WMS).</p>`:""}
+      ${p.recentes.length?`<label class="ck small"><input type="checkbox" id="imprec" ${p.incluirRecentes?"checked":""}>Incluir mesmo assim as ${p.recentes.length} com produção finalizada nos últimos ${DIAS_EXP_RECENTE} dias úteis (entram como Produzida, sem envio e agenda)</label>`:""}
       ${p.desconhecidos.length?`<div class="notice">Status do WMS não reconhecido: ${p.desconhecidos.map(([c,n])=>`<b>${esc(c)}</b> (${n})`).join(", ")}. Essas cargas mantêm o status atual. Me avise o que significam para eu incluir.</div>`:""}
       ${p.sujoAntes?`<div class="notice">Há mudanças feitas neste navegador que ainda não foram para a planilha. O WMS só atualiza status para a frente, então elas não se perdem, mas lembre de clicar em Baixar base depois.</div>`:""}`;
   } else if(p.fase==="gravando"){
