@@ -186,7 +186,7 @@ async function enviar(destinos: string[], assunto: string, html: string) {
   });
   if (!r.ok) { const t = await r.text(); console.error("brevo", r.status, t); throw new Error("Falha no envio (" + r.status + ")"); }
 }
-const validos = (l: unknown) => [...new Set((Array.isArray(l) ? l : []).map((x) => String(x).trim().toLowerCase()).filter((x) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)))].slice(0, 20);
+const validos = (l: unknown) => [...new Set((Array.isArray(l) ? l : []).map((x) => String(x).trim().toLowerCase()).filter((x) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(x)))].slice(0, 20);
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });

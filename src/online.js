@@ -396,7 +396,7 @@ function criarExt(sb,info){
     E.cad=novo; desenhar("cadastro"); return true;
   }
   const emailsDe=t=>[...new Set(String(t||"").split(/[\s,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean))];
-  const emailOk=x=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x);
+  const emailOk=x=>/^[^@\s]+@[^@\s.]+(\.[^@\s.]+)*\.[a-z]{2,}$/i.test(x);
 
   /* ---------- eventos das abas ---------- */
   function ligar(v,el){
