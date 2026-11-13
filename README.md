@@ -4,21 +4,24 @@
 
 # 📦 Painel de Cargas
 
-**Controle das cargas de envio para o Mercado Livre: da roteirização à entrega.**
+**Controle online das cargas de envio para o Mercado Livre: da roteirização à entrega.**
 
-Aplicativo instalável no computador e no celular, que funciona sem internet e lê a planilha base da equipe.
+Site com login e perfis de acesso, onde a equipe toda acompanha as mesmas cargas em tempo real.
 
-[![Acessar o painel](https://img.shields.io/badge/▶_Acessar_o_painel-1d5fa8?style=for-the-badge)](https://allan056.github.io/painel-cargas/)
+[![Acessar o painel](https://img.shields.io/badge/▶_Acessar_o_painel-1d5fa8?style=for-the-badge)](https://painel-cargas-canais-digitais.netlify.app/)
 
-![PWA](https://img.shields.io/badge/PWA-instalável-5a0fc8?style=flat-square&logo=pwa&logoColor=white)
-![Offline](https://img.shields.io/badge/funciona-offline-2e8b57?style=flat-square)
 ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white)
 ![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
+![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=flat-square&logo=supabase&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+![Deno](https://img.shields.io/badge/Edge_Functions-000000?style=flat-square&logo=deno&logoColor=white)
+![Netlify](https://img.shields.io/badge/Netlify-00C7B7?style=flat-square&logo=netlify&logoColor=white)
+![Brevo](https://img.shields.io/badge/Brevo-0B996E?style=flat-square&logo=brevo&logoColor=white)
 ![Excel](https://img.shields.io/badge/Excel-217346?style=flat-square&logo=microsoftexcel&logoColor=white)
 ![Status](https://img.shields.io/badge/status-em_uso-1d5fa8?style=flat-square)
 
-<img src="imgs/painel-destaque.png" alt="Tela principal do Painel de Cargas" width="100%">
+<img src="imgs/painel.png" alt="Tela principal do Painel de Cargas" width="100%">
 
 </div>
 
@@ -28,9 +31,11 @@ Aplicativo instalável no computador e no celular, que funciona sem internet e l
 
 O **Painel de Cargas** nasceu da necessidade de acompanhar, em um só lugar, as cargas que estão em produção e as que ainda vão ser produzidas para envio ao **Mercado Livre**.
 
-Antes, o controle era feito direto na planilha, sem uma visão clara de **qual carga acompanhar primeiro** e **em que etapa cada uma estava**. O painel lê a planilha base e mostra isso na hora, aplicando automaticamente a regra acordada com a operação:
+Antes, o controle era feito direto na planilha, sem uma visão clara de **qual carga acompanhar primeiro** e **em que etapa cada uma estava**. O projeto começou como um arquivo HTML que lia a planilha, virou um aplicativo instalável e hoje é um **site online** com banco de dados, login, perfis, ocorrências, histórico de alterações e e-mails automáticos.
 
-> 🗓️ **A carga deve entrar no cronograma 3 dias úteis antes da data de agenda**, e o **R.F. deve ser informado 1 dia útil antes do cronograma**.
+A regra acordada com a operação é aplicada sozinha:
+
+> 🗓️ **A carga entra no cronograma 3 dias úteis antes da agenda**, o **R.F. é informado 1 dia útil antes do cronograma** e a **expedição é na véspera da agenda** (a entrega no Mercado Livre é na madrugada do dia agendado).
 
 ---
 
@@ -38,47 +43,92 @@ Antes, o controle era feito direto na planilha, sem uma visão clara de **qual c
 
 | | Funcionalidade | O que faz |
 |---|---|---|
-| 🏭 | **Cargas para produção** | Próximas cargas do dia, colunas por etapa e visão por envio |
-| 🧮 | **Datas automáticas** | Calcula *Cronograma* e *Informar R.F.* em dias úteis, sem fins de semana e feriados |
-| 🚨 | **Alertas** | Fora do prazo, incluir hoje, informar R.F. hoje, risco de atraso, entrega atrasada |
-| ✏️ | **Status no painel** | Muda o status de uma carga (ou de várias) com data e histórico |
-| 🗓️ | **Calendário** | Visão semanal e mensal por galpão, com as **cargas conjugadas** destacadas |
+| 🔐 | **Login e criação de conta** | Usuário e senha; conta nova só com o **código do time**; "esqueci minha senha" por e-mail |
+| 👥 | **Perfis de acesso** | **Administrador Master**, **Administrador** e **Visualizador**, com as regras aplicadas no próprio banco (RLS) |
+| ⚡ | **Tempo real** | O que uma pessoa muda aparece na hora para todo mundo ("Ao vivo") |
+| 🏭 | **Cargas para produção** | Próximas cargas, colunas por etapa e visão por envio |
+| 📊 | **Cartões do topo** | Em produção, expedir hoje, atrasadas e próxima carga, clicáveis |
+| 🔎 | **Busca** | Carga, envio, galpão ou loja, em todas as abas |
+| 🧮 | **Datas automáticas** | Cronograma, R.F. e expedição em dias úteis, sem fins de semana e feriados |
+| 🚨 | **Alertas** | Fora do prazo, informar R.F. hoje, incluir hoje, expedir hoje, risco de atraso |
+| 🗓️ | **Calendário** | Semana e mês por galpão, com as **cargas conjugadas** (mesmo envio) destacadas |
 | 📈 | **Indicadores** | % no prazo do cronograma, % entregue na agenda e tempo médio por etapa |
-| 🔎 | **Filtros e busca** | Por galpão, loja destino, status, carga ou envio |
-| 📥 | **Importação do WMS** | Lê o relatório de cargas do Infor WMS, cria as cargas novas e avança o status sozinho (ex.: produzida, expedida) |
-| 🗓️ | **Agendar em lote** | Informa o envio e a data de agenda do portal ML para várias cargas de uma vez |
-| ✅ | **Conferência da base** | Ao carregar a planilha, mostra problemas e o que vai mudar antes de gravar |
-| 📤 | **Exportação para Excel** | Cargas selecionadas ou a base completa, com histórico e regras |
-| 💬 | **Resumo do dia** | Texto pronto para colar no Teams ou WhatsApp |
-| ⚙️ | **Regras ajustáveis** | Dias úteis da regra e do R.F. mudam no painel ou na planilha |
+| 📥 | **Importação do WMS** | Lê o relatório do Infor WMS e avança o status sozinho, ignorando status operacionais |
+| ⚠️ | **Ocorrências** | Registro e resolução de problemas por carga, com autor e data |
+| 🕓 | **Histórico** | Toda alteração com data, hora e quem fez, gravada pelo banco (não dá para editar) |
+| 🗂️ | **Cadastro** | Equipes, funções, perfis, lojas, galpões, tipos de ocorrência e código do time |
+| ✉️ | **E-mails automáticos** | Resumo do dia (horário e destinatários editáveis) e relatório semanal de uso |
+| 🗄️ | **Arquivamento** | Cargas encerradas saem do painel após 60 dias e são apagadas após 12 meses |
+| 🌗 | **Tema** | Auto, escuro ou claro |
+| ❓ | **Ajuda** | Guia dentro do próprio site, de acordo com o perfil |
 
 ---
 
 ## 🖼️ Prints
 
-### ☀️ Painel no visual Claro
-<img src="imgs/painel-claro.png" alt="Painel no visual Claro" width="100%">
+### 🔐 Entrar ou criar conta
+<img src="imgs/login.png" alt="Tela de login" width="100%">
 
-### 🗓️ Calendário semanal, com as cargas conjugadas
-<img src="imgs/calendario-semana.png" alt="Calendário semanal por galpão" width="100%">
+### ⚠️ Ocorrências
+<img src="imgs/ocorrencias.png" alt="Ocorrências" width="100%">
 
-### 📅 Calendário mensal
-<img src="imgs/calendario-mes.png" alt="Calendário mensal" width="100%">
+### 🕓 Histórico de alterações
+<img src="imgs/historico.png" alt="Histórico" width="100%">
+
+### 🗂️ Cadastro (Administrador Master)
+<img src="imgs/cadastro.png" alt="Cadastro" width="100%">
+
+### 🗓️ Calendário com as cargas conjugadas
+<img src="imgs/calendario.png" alt="Calendário" width="100%">
 
 ### 📈 Indicadores
 <img src="imgs/indicadores.png" alt="Indicadores" width="100%">
 
+### 🔎 Busca por envio
+<img src="imgs/busca.png" alt="Busca" width="100%">
+
+### ☀️ Tema claro
+<img src="imgs/tema-claro.png" alt="Tema claro" width="100%">
+
 <table>
 <tr>
-<td width="62%"><b>✏️ Detalhes da carga e histórico</b><br><br><img src="imgs/detalhe-carga.png" alt="Detalhes da carga"></td>
+<td width="62%"><b>✏️ Detalhes da carga, ocorrências e histórico</b><br><br><img src="imgs/detalhe-carga.png" alt="Detalhes da carga"></td>
 <td width="38%" align="center"><b>📱 No celular</b><br><br><img src="imgs/celular.png" alt="Painel no celular" width="260"></td>
 </tr>
 </table>
 
-### ✅ Conferência da planilha ao carregar
-<img src="imgs/importacao.png" alt="Conferência da base" width="100%">
+### ❓ Ajuda
+<img src="imgs/ajuda.png" alt="Ajuda" width="100%">
 
-> ℹ️ Os prints usam uma **base de demonstração com números fictícios**.
+> ℹ️ Os prints usam uma **base de demonstração com números e nomes fictícios**.
+
+---
+
+## 🏗️ Arquitetura
+
+```mermaid
+flowchart LR
+    U([Equipe]) -->|navegador| N[Netlify<br>site estático]
+    N -->|login e dados| S[(Supabase<br>PostgreSQL + RLS)]
+    S -->|tempo real| N
+    S --> F1[Edge Function<br>contas]
+    S --> F2[Edge Function<br>resumo]
+    C[pg_cron<br>a cada 15 min] --> F2
+    F1 -->|esqueci a senha| B[Brevo<br>e-mail]
+    F2 -->|resumo do dia<br>relatório semanal| B
+    W[Relatório do<br>Infor WMS] -->|Carregar base| N
+```
+
+| Camada | Como funciona |
+|---|---|
+| 🌐 **Site** | Uma página HTML/CSS/JS sem frameworks, publicada no Netlify. O leitor de Excel só carrega quando alguém importa uma planilha |
+| 🗄️ **Banco** | PostgreSQL no Supabase. Tabelas `cargas`, `ocorrencias`, `historico`, `perfis`, `cargas_config` |
+| 🛡️ **Segurança** | Row Level Security: Visualizador só lê, Administrador altera cargas e ocorrências, só o Master muda regras, perfis e cadastros |
+| 🕓 **Histórico** | Gatilhos (triggers) gravam cada alteração com autor e horário definidos pelo servidor |
+| ✉️ **E-mails** | `pg_cron` confere a cada 15 minutos o horário configurado no site e chama a função `resumo`, que monta o e-mail e envia pelo Brevo |
+| 🧹 **Manutenção** | Rotina diária arquiva cargas encerradas após 60 dias e apaga dados com mais de 12 meses |
+
+Tudo roda dentro dos **planos gratuitos** do Supabase, Netlify e Brevo.
 
 ---
 
@@ -91,7 +141,7 @@ flowchart LR
     B -->|até 3 d.u.<br>antes da agenda| C[Próxima a<br>produzir]
     C --> D[Em produção]
     D --> E[Produzida]
-    E --> F[Expedida]
+    E -->|véspera da agenda| F[Expedida]
     F --> G([Entregue no<br>Mercado Livre])
     B -.-> X([Cancelada])
 ```
@@ -100,34 +150,20 @@ flowchart LR
 |---|---|
 | 📌 **Cronograma até** | Data de agenda − **3 dias úteis** |
 | 📝 **Informar R.F.** | Data do cronograma − **1 dia útil** |
-| 🚚 **Agenda ML** | Data de entrega no Mercado Livre (vem da planilha) |
+| 🚚 **Expedição** | Véspera da agenda |
+| 🗓️ **Agenda ML** | Data de entrega no Mercado Livre (portal ML) |
 
-*Dias úteis consideram fins de semana, feriados nacionais e feriados extras cadastrados.*
+*Dias úteis consideram fins de semana, feriados nacionais e feriados locais cadastrados.*
 
 ---
 
-## 📲 Como instalar
+## 👥 Perfis
 
-| Aparelho | Passo a passo |
+| Perfil | Pode |
 |---|---|
-| 💻 **Computador** (Chrome ou Edge) | Abra o [painel](https://allan056.github.io/painel-cargas/) e clique em **Instalar** |
-| 🤖 **Android** (Chrome) | Menu **⋮** → **Instalar app** |
-| 🍎 **iPhone** (Safari) | **Compartilhar** → **Adicionar à Tela de Início** |
-
-Depois de instalado, o painel abre como um aplicativo e **funciona sem internet**.
-
----
-
-## 🚀 Como usar
-
-1. Extraia o relatório de cargas do **WMS** e clique em **Carregar base**: o painel reconhece o arquivo, mostra o que vai mudar e você confirma
-2. Depois de agendar no **portal do Mercado Livre**, marque as cargas e use **Agendar** para informar o envio e a data de agenda
-3. Acompanhe as cargas; o WMS avança o status sozinho, e o que não vem dele você muda clicando no número da carga
-4. Clique em **Baixar base** e salve a planilha na pasta da equipe
-
-> 📥 Do relatório do WMS, o painel usa só o necessário: nº da ordem (carga), data da ordem (roteirização), galpão, receptor (loja destino), estimativa de paletes, status e data real de expedição.
-
-> 🚚 No Infor, **Expedida** quer dizer produção finalizada: no painel a carga vira **Produzida**. A expedição de fato é na **véspera da agenda**, porque a entrega no Mercado Livre é na madrugada do dia agendado. A partir desse dia, o WMS passa a carga para **Expedida**.
+| 👑 **Administrador Master** | Tudo: regras, perfis, cadastros, e-mails automáticos e código do time |
+| 🛠️ **Administrador** | Carregar base e WMS, mudar status e agenda, registrar e resolver ocorrências |
+| 👀 **Visualizador** | Ver, buscar, baixar a base e copiar o resumo (padrão de toda conta nova) |
 
 ---
 
@@ -137,7 +173,7 @@ Depois de instalado, o painel abre como um aplicativo e **funciona sem internet*
 |---|---|
 | `#ENVIO` | Número do envio (pode ter uma ou mais cargas) |
 | `CARGA` | Número da carga roteirizada |
-| `GALPÃO` | Galpão onde a carga será produzida |
+| `GALPÃO` | Galpão onde a carga é produzida |
 | `LOJA DESTINO` | Loja para onde a carga vai |
 | `DATA ROTEIRIZAÇÃO` | Data em que a carga foi criada |
 | `DATA AGENDA` | Data de entrega no Mercado Livre |
@@ -145,18 +181,18 @@ Depois de instalado, o painel abre como um aplicativo e **funciona sem internet*
 | `PALETES` | Estimativa de paletes (vem do WMS) |
 | `OBSERVAÇÃO` | Livre |
 
-As colunas **Data Cronograma** e **Data Informar R.F.** são calculadas pela própria planilha, a partir das células de regra.
+Exemplo com dados fictícios em [`exemplo/Base_DEMO.xlsx`](exemplo/Base_DEMO.xlsx).
 
 ---
 
 ## 🛠️ Tecnologias utilizadas
 
 - **HTML5, CSS3 e JavaScript**, sem frameworks
-- **PWA** (Service Worker + Web App Manifest) para instalar e funcionar offline
-- **[SheetJS](https://sheetjs.com/)** para ler e gerar arquivos Excel no próprio navegador
-- **Armazenamento local** do navegador para guardar a última base em cada aparelho
+- **[Supabase](https://supabase.com/)**: PostgreSQL, autenticação, Row Level Security, Realtime, Edge Functions (Deno/TypeScript), `pg_cron` e `pg_net`
+- **[Netlify](https://www.netlify.com/)** para hospedar o site
+- **[Brevo](https://www.brevo.com/)** para os e-mails (senha, resumo do dia, relatório semanal)
+- **[SheetJS](https://sheetjs.com/)** para ler e gerar Excel no próprio navegador
 - **Excel** com fórmulas `DIATRABALHO` (`WORKDAY`) na planilha base
-- **GitHub Pages** para publicação
 
 ---
 
@@ -164,19 +200,35 @@ As colunas **Data Cronograma** e **Data Informar R.F.** são calculadas pela pr�
 
 ```
 painel-cargas/
-├── index.html              → aplicativo completo (interface, regras e leitor de Excel)
-├── sw.js                   → service worker (funcionamento offline e atualizações)
-├── manifest.webmanifest    → dados de instalação do app
-├── icon-*.png              → ícones do aplicativo
-├── imgs/                   → prints usados neste README
-└── README.md               → documentação do projeto
+├── site/                       → site publicado no Netlify (gerado por src/build_site.py)
+├── src/
+│   ├── painel-cargas.html      → painel: interface, regras de prazo, calendário, indicadores, importação
+│   ├── online.js               → login, dados no Supabase, tempo real, Histórico, Ocorrências e Cadastro
+│   └── build_site.py           → monta o site a partir dos dois arquivos acima
+├── supabase/
+│   ├── schema.sql              → tabelas, segurança (RLS), gatilhos do histórico e rotinas automáticas
+│   └── functions/
+│       ├── contas/index.ts     → entrar, criar conta, esqueci a senha, código do time
+│       └── resumo/index.ts     → resumo do dia e relatório semanal por e-mail
+├── arquivo/Painel_de_Cargas.html → versão em arquivo único, que roda offline no navegador
+├── exemplo/Base_DEMO.xlsx      → planilha base com dados fictícios
+├── imgs/                       → prints deste README
+└── index.html, sw.js           → aviso do app instalável antigo (aposentado)
 ```
+
+---
+
+## 🧭 Evolução
+
+1. **Arquivo HTML** que lia a planilha da equipe
+2. **Aplicativo instalável (PWA)** no GitHub Pages, funcionando offline
+3. **Site online** com Supabase e Netlify: login, perfis, tempo real, ocorrências, histórico, cadastro e e-mails automáticos
 
 ---
 
 ## 🔒 Dados e privacidade
 
-Este repositório guarda **somente o aplicativo**. Nenhuma informação de carga é enviada para o GitHub ou para qualquer servidor: os dados ficam no aparelho de cada pessoa e a **planilha base continua sendo a fonte oficial** da equipe.
+Este repositório guarda **somente o código**. Os dados das cargas ficam no banco do Supabase, protegidos por login e pelas regras de acesso; nenhum dado real está no GitHub. A chave que aparece no site é a chave pública do Supabase, feita para ficar no navegador: o que protege os dados são as regras de segurança do banco.
 
 ---
 
