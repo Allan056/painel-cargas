@@ -587,6 +587,26 @@ footer{color:var(--muted)}
 .mail input[type=checkbox],.ocform input[type=checkbox],.acrow input[type=checkbox],.sec input[type=checkbox],.fgrid input[type=checkbox]{width:17px;height:17px;flex:none;max-width:none;padding:0}
 .mail .fgrid{align-items:end}
 input,select,textarea{box-sizing:border-box;max-width:100%}
+/* colunas que abrem e fecham */
+.col{align-content:start}
+.colh{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;width:100%;padding:12px 14px;border-radius:var(--r-m);background:var(--surface);border:1px solid var(--line);backdrop-filter:blur(10px);position:relative;transition:border-color .2s,box-shadow .2s}
+.colh::before{content:"";position:absolute;left:14px;right:auto;bottom:-1px;width:44px;height:2px;background:var(--c);box-shadow:0 0 10px var(--c)}
+.colh:hover{border-color:color-mix(in srgb,var(--c) 55%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 25%,transparent)}
+.colh:focus-visible{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}
+.colh .n{font-family:var(--mono);font-size:24px;font-weight:600;color:var(--fg)}
+.chev{width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translate(-2px,-2px);transition:transform .2s}
+.colh[aria-expanded="true"] .chev{transform:rotate(-135deg) translate(-2px,-2px)}
+.col.aberta .colh{border-color:color-mix(in srgb,var(--c) 40%,var(--line))}
+.colres{display:flex;flex-wrap:wrap;gap:6px;padding:2px 4px}
+.colal{font:600 11.5px var(--mono);color:var(--ac);border:1px solid color-mix(in srgb,var(--ac) 45%,transparent);background:color-mix(in srgb,var(--ac) 12%,transparent);border-radius:999px;padding:3px 9px}
+.colok{font-size:12.5px;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.col.aberta>.card,.col.aberta>.none{animation:desce .28s cubic-bezier(.2,.7,.2,1) both}}
+@keyframes desce{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.prodhead{align-items:center}
+.toolbar{justify-content:flex-end}
+.rodapebase{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 16px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px;padding-bottom:26px;margin-top:6px}
+.rodapebase b{color:var(--fg);font-weight:600}
+@media (max-width:640px){.rodapebase{padding-bottom:110px}}
 /* entrada suave do painel (uma vez) */
 @media (prefers-reduced-motion:no-preference){
   .kpis .kpi{animation:sobe .55s cubic-bezier(.2,.7,.2,1) both}
@@ -656,6 +676,13 @@ let imp=null; // prévia de importação
 let bulkSt="2", bulkData="", bulkBusy=false, bulkEnvio="", bulkAgenda="";
 let calStart=null, calModo="cron", calMes=null, calVista="semana"; try{calVista=localStorage.getItem("painel-cal-vista")==="mes"?"mes":"semana";}catch(e){}
 let kpiMes="", buscaT=null;
+let colsAbertas=new Set(); try{colsAbertas=new Set(JSON.parse(localStorage.getItem("painel-cols")||"[]"));}catch(e){}
+const guardaCols=()=>{try{localStorage.setItem("painel-cols",JSON.stringify([...colsAbertas]));}catch(_){}};
+/* resumo de uma coluna fechada: quantas cargas em cada alerta */
+function resumoCol(list){const c=new Map();list.forEach(r=>{if(r.nivel==="ok"||r.nivel==="none")return;const k=r.alerta;const x=c.get(k)||{n:0,nivel:r.nivel};x.n++;c.set(k,x);});
+  if(!list.length) return `<span class="colok">nenhuma carga</span>`;
+  if(!c.size) return `<span class="colok">tudo no prazo</span>`;
+  return [...c.entries()].sort((a,b)=>({crit:0,high:1,warn:2}[a[1].nivel]-{crit:0,high:1,warn:2}[b[1].nivel])).map(([k,x])=>`<span class="colal" style="--ac:var(${AL[x.nivel]})">${x.n} ${esc(k.toLowerCase())}</span>`).join("");}
 let cfgOpen=false, cfgDraft=null, salvandoRegra=false;
 let rows=[], allRows=[], lastVis=[], lastSig=null, lastMeta=null, lastCfg=null;
 const names={}; const askedNames=new Set();
@@ -844,7 +871,7 @@ function render(){
     </div></div>
     <div class="in top">
       <nav class="tabs">${abas.map(([id,n])=>`<a href="#${id}" aria-current="${v===id?"page":"false"}">${n}</a>`).join("")}</nav>
-      ${!ehExt?`<div class="toolbar"><div class="meta">${metaTxt}</div><div class="actions">
+      ${!ehExt?`<div class="toolbar"><div class="actions">
         <button class="btn ghost" id="resumo">Copiar resumo do dia</button>
         <button class="btn ${modoLocal&&sujo?"":"ghost"}" id="baixar" ${modoLocal&&sujo?'title="Há mudanças feitas no painel que ainda não estão na planilha"':""}>Baixar base${modoLocal&&sujo?" ●":""}</button>
         ${docs.size&&!retrato&&!modoLocal?`<button class="btn ghost" id="exphtml" title="Arquivo com as cargas de agora, para abrir em qualquer navegador">Exportar HTML</button>`:""}
@@ -870,7 +897,8 @@ function render(){
   else body=v==="calendario"?vCalendario():v==="indicadores"?vIndicadores():vPainel();
   if(v==="ajuda") body=vAjuda();
   else if(EXT.includes(v)&&online&&loaded) body=`<div class="in main" id="ext-slot"></div>`;
-  $("#app").innerHTML=head+body;
+  const rodape=loaded?`<div class="in rodapebase"><span>${metaTxt}</span>${online?`<span>Painel de Cargas · Canais Digitais</span>`:""}</div>`:"";
+  $("#app").innerHTML=head+body+rodape;
   const slot=$("#ext-slot"); if(slot&&window.PAINEL_EXT) PAINEL_EXT.montar(v,slot);
   document.querySelectorAll("[data-ind]").forEach(el=>{el.indeterminate=true;});
   renderXbar(); if(openId) renderDrawerInfo();
@@ -888,6 +916,7 @@ function vAjuda(){
     ${sec("Primeiros passos",[
       on?"Entre com seu <b>usuário e senha</b>. Para criar conta você precisa do <b>código do time</b> (peça ao Administrador Master).":"Abra o arquivo do painel no navegador e use <b>Carregar base</b>.",
       "Na aba <b>Painel</b> ficam as cargas em produção e a produzir, com a <b>próxima carga</b> em destaque e a fila de acompanhamento (críticas primeiro).",
+      "As colunas <b>Aguardando cronograma</b>, <b>Próxima a produzir</b>, <b>Em produção</b> e <b>Por envio</b> começam recolhidas, mostrando só o que pede atenção. Clique no título para ver as cargas.",
       "Os <b>cartões do topo</b> mostram o que está em produção, o que expede hoje, o que está atrasado e a próxima carga. Clique neles para ir direto à lista.",
       "Use a <b>busca</b> do topo para achar uma carga ou um envio específico. Ela vale para todas as abas.",
       "Escolha um <b>galpão</b> (G10, G20…) para ver só as cargas dele."],"ol")}
@@ -922,8 +951,8 @@ function vAjuda(){
       "Dentro da carga, <b>Abrir mensagens</b> monta o texto para WhatsApp ou Teams com o envio e as cargas dele: <b>Informar R.F.</b>, <b>Avisar expedição</b> e <b>Reagendamento</b>. Ajuste se quiser e clique em <b>Copiar</b>.",
       "Com várias cargas marcadas, o botão <b>Mensagem</b> na barra de baixo faz o mesmo para todas.",
       "<b>Copiar resumo do dia</b> abre o resumo pronto, com o botão Copiar.",
-      "<b>Pendências de cadastro</b> (acima da fila) lista as cargas em aberto sem envio, agenda, galpão, loja ou paletes. Clique para ver só elas.",
-      "No card <b>Por envio</b>, a barra mostra quantas cargas do envio já foram produzidas. Quando todas estão Produzidas, aparece <b>Envio pronto para expedir</b>."])}
+      "O filtro <b>Pendências de cadastro</b>, na fila de acompanhamento, mostra as cargas em aberto sem envio, agenda, galpão, loja ou paletes.",
+      "Na coluna <b>Por envio</b>, a barra mostra quantas cargas do envio já foram produzidas. Quando todas estão Produzidas, aparece <b>Envio pronto para expedir</b>."])}
     ${m?sec("Paletes PBR (só você vê)",[
       "Só o palete <b>PBR</b> volta do Mercado Livre; o CHEP não. A aba <b>Paletes</b> mostra o saldo de PBR enviados ainda não devolvidos, com a barra até o limite.",
       "O PBR de cada carga conta como enviado na <b>data da agenda</b>. Preencha <b>Paletes PBR</b> e <b>Paletes CHEP</b> na base (colunas da planilha) ou dentro da carga.",
@@ -982,6 +1011,34 @@ setInterval(()=>{const h=$("#relogio");if(h)h.textContent=horaAgora();const vv=$
 const ckb=(id)=>`<input type="checkbox" data-sel="${esc(id)}" ${sel.has(id)?"checked":""} aria-label="Selecionar carga">`;
 const ocSet=()=>window.PAINEL_EXT&&PAINEL_EXT.ocAbertas?PAINEL_EXT.ocAbertas():new Set();
 const cgBtn=(r)=>`<button class="cg" data-open="${esc(r.id)}" title="Abrir carga">${esc(r.carga)}${ocSet().has(String(r.carga))?'<span class="ocm" title="Ocorrência aberta">⚠</span>':""}</button>`;
+let visao="cartoes"; try{visao=localStorage.getItem("painel-visao")||"cartoes";}catch(e){}
+function cardCarga(r){
+  const c=r.cod;
+  const linha=!r.agenda?`<span class="k">Sem envio e agenda · agende no portal ML e informe aqui</span>`
+    :c===1?`<span><span class="k">R.F.</span> <b>${br(r.rf)}</b> ${wdS(r.rf)} · ${r.rfInfo?'<span class="rfok">informado ✓</span>':prazoTxt(r.duRf)}</span><span><span class="k">Cronograma até</span> <b>${br(r.lim)}</b> ${wdS(r.lim)}</span><span><span class="k">Agenda</span> <b>${br(r.agenda)}</b> ${wdS(r.agenda)}</span>`
+    :c>=2&&c<=4?`<span><span class="k">Expedição</span> <b>${br(r.exp)}</b> ${wdS(r.exp)}</span><span><span class="k">Agenda</span> <b>${br(r.agenda)}</b> ${wdS(r.agenda)} · ${prazoTxt(r.duAg)}</span>`
+    :`<span><span class="k">Agenda</span> <b>${br(r.agenda)}</b> ${wdS(r.agenda)}</span>`;
+  return `<article class="card ${sel.has(r.id)?"on":""} ${aberta(r)?"":"fech"}" style="${av(r)};${cv(c)}">
+    <div class="r1"><label class="ck">${ckb(r.id)}</label><span style="flex:1;min-width:0">${cgBtn(r)}</span><span class="tag ${r.nivel==="ok"||r.nivel==="none"?"soft":""}">${esc(r.alerta)}</span></div>
+    <div class="env"><span class="stp"><span class="dot"></span>${ST[c].nome}</span>${r.envio?" · Envio "+esc(r.envio):""}${r.galpao?" · "+esc(r.galpao):""}${r.volume!=null?" · "+fmtN(r.volume)+(r.volume===1?" palete":" paletes"):""}</div>
+    <div class="r2">${linha}</div>
+    ${filtro==="pend"?`<div class="small pendtx">${pendDe(r).join(" · ")}</div>`:""}
+    ${canWrite&&c>=1&&c<=5?`<div class="r3">${c===1&&r.agenda&&!r.rfInfo?`<button class="adv rfb" data-rf1="${esc(r.id)}" title="Marcar que o R.F. já foi informado">✓ R.F. informado</button>`:""}<button class="adv" data-adv="${esc(r.id)}" title="Registrar avanço com a data de hoje">→ ${ST[c+1].nome}</button></div>`:""}
+  </article>`;
+}
+function cardEnvio(x){
+  const allSel=x.a.every(r=>sel.has(r.id)), some=x.a.some(r=>sel.has(r.id));
+  const ags=[...new Set(x.a.map(r=>r.agenda).filter(Boolean))].sort();
+  const pior=x.a.slice().sort((a,b)=>a.key-b.key)[0];
+  const vivas=x.l.filter(r=>r.cod!==0), prod=vivas.filter(r=>r.cod>=4).length, pronto=vivas.length>0&&vivas.every(r=>r.cod===4), expd=vivas.length>0&&vivas.every(r=>r.cod>=5);
+  const pct=vivas.length?Math.round(100*prod/vivas.length):0;
+  return `<article class="card envc ${allSel?"on":""} ${pronto?"pronto":""}" style="${av(pior)}">
+    <div class="r1"><label class="ck"><input type="checkbox" data-selenv="${esc(x.e)}" ${allSel?"checked":""} ${some&&!allSel?'data-ind="1"':""} aria-label="Selecionar envio"><span class="mono" style="font-size:17px;font-weight:600">${esc(x.e)}</span></label><span class="k" style="font-size:12px">${pl(x.l.length,"carga")}</span></div>
+    <div class="envp"><div class="envbar"><i style="width:${pct}%"></i></div><span>${expd?"envio expedido":`${prod} de ${vivas.length} produzida${vivas.length===1?"":"s"}`}</span></div>
+    ${pronto?`<div class="envok">Pronto para expedir${canWrite?` <button class="adv" data-expenv="${esc(x.e)}" title="Marcar todas as cargas do envio como Expedida (hoje)">→ Expedir envio</button>`:""}</div>`:""}
+    <div class="env">Agenda ${ags.map(a=>br(a)+" "+wdS(a)).join(", ")||"—"}${sumVol(x.l)}</div>
+    <ul class="ec">${x.l.map(r=>`<li class="${aberta(r)?"":"closed"}" style="${cv(r.cod)}"><span class="dot"></span>${cgBtn(r)}<span class="k">${ST[r.cod].nome}${r.galpao?" · "+esc(r.galpao):""}</span></li>`).join("")}</ul></article>`;
+}
 function vPainel(){
   const ab=rows.filter(aberta);
   const prodRows=rows.filter(r=>r.cod>=1&&r.cod<=3);
@@ -1007,8 +1064,9 @@ function vPainel(){
         ${canWrite?`<div class="r3">${c===1&&r.agenda&&!r.rfInfo?`<button class="adv rfb" data-rf1="${esc(r.id)}" title="Marcar que o R.F. já foi informado">✓ R.F. informado</button>`:""}<button class="adv" data-adv="${esc(r.id)}" title="Registrar avanço com a data de hoje">→ ${ST[c+1].nome}</button></div>`:""}
       </div>`).join("");
     const sub={1:"roteirizadas, ainda fora do cronograma",2:"no cronograma, aguardando produção",3:"produzindo agora"}[c];
-    return `<div class="col" style="${cv(c)}"><div class="colh"><div><div class="t">${ST[c].nome}</div><div class="sub">${sub}</div></div><span class="n">${list.length}</span></div>
-      ${cards||`<div class="none">Nenhuma carga.</div>`}${list.length>MAX?`<div class="more">+ ${list.length-MAX} na tabela abaixo</div>`:""}</div>`;
+    const op=colsAbertas.has(String(c));
+    return `<div class="col ${op?"aberta":""}" style="${cv(c)}"><button class="colh" data-col="${c}" aria-expanded="${op}"><div><div class="t">${ST[c].nome}</div><div class="sub">${sub}</div></div><span class="n">${list.length}</span><span class="chev" aria-hidden="true"></span></button>
+      ${op?(cards||`<div class="none">Nenhuma carga.</div>`)+(list.length>MAX?`<div class="more">+ ${list.length-MAX} na tabela abaixo</div>`:""):`<div class="colres">${resumoCol(list)}</div>`}</div>`;
   }).join("");
   const envMap=new Map(); rows.forEach(r=>{if(!envMap.has(r.envio))envMap.set(r.envio,[]);envMap.get(r.envio).push(r);});
   const envios=[...envMap.entries()].map(([e,l])=>{const a=l.filter(aberta);return {e,l,a,key:a.length?Math.min(...a.map(r=>r.key)):Infinity};}).filter(x=>x.a.length&&x.e).sort((a,b)=>a.key-b.key);
@@ -1024,8 +1082,12 @@ function vPainel(){
       ${pronto?`<div class="envok">Envio pronto para expedir${canWrite?` <button class="adv" data-expenv="${esc(x.e)}" title="Marcar todas as cargas do envio como Expedida (hoje)">→ Expedir envio</button>`:""}</div>`:""}
       <div class="env">Agenda ${ags.map(a=>br(a)+" "+wdS(a)).join(", ")||"—"}${(()=>{const ls=[...new Set(x.l.map(r=>r.loja).filter(Boolean))];return ls.length?" · Loja "+ls.map(esc).join(", "):"";})()}${sumVol(x.l)}</div>
       <ul class="ec">${x.l.map(r=>`<li class="${aberta(r)?"":"closed"}" style="${cv(r.cod)}"><span class="dot"></span>${cgBtn(r)}<span class="k">${ST[r.cod].nome}${r.galpao?" · "+esc(r.galpao):""}</span></li>`).join("")}</ul></div>`;}).join("");
-  const envCol=`<div class="col" style="--c:var(--band-muted)"><div class="colh"><div><div class="t">Por envio</div><div class="sub">envios em aberto e suas cargas</div></div><span class="n">${envios.length}</span></div>
-      ${envCards||`<div class="none">Nenhum envio em aberto.</div>`}${envios.length>MAX?`<div class="more">+ ${envios.length-MAX} envios na tabela abaixo</div>`:""}</div>`;
+  const envOp=colsAbertas.has("env");
+  const nPronto=envios.filter(x=>{const v=x.l.filter(r=>r.cod!==0);return v.length>0&&v.every(r=>r.cod===4);}).length;
+  const envRes=!envios.length?`<span class="colok">nenhum envio em aberto</span>`:nPronto?`<span class="colal" style="--ac:var(--ok)">${nPronto} ${nPronto===1?"envio pronto":"envios prontos"} para expedir</span>`:`<span class="colok">nenhum pronto para expedir</span>`;
+  const envCol=`<div class="col ${envOp?"aberta":""}" style="--c:var(--band-muted)"><button class="colh" data-col="env" aria-expanded="${envOp}"><div><div class="t">Por envio</div><div class="sub">envios em aberto e suas cargas</div></div><span class="n">${envios.length}</span><span class="chev" aria-hidden="true"></span></button>
+      ${envOp?(envCards||`<div class="none">Nenhum envio em aberto.</div>`)+(envios.length>MAX?`<div class="more">+ ${envios.length-MAX} envios na tabela abaixo</div>`:""):`<div class="colres">${envRes}</div>`}</div>`;
+  const todasAb=["1","2","3","env"].every(k=>colsAbertas.has(k));
 
   const cnt={}; rows.forEach(r=>{cnt[r.cod]=(cnt[r.cod]||0)+1;});
   const flow=ORDEM.map(c=>`<button class="step" style="${cv(c)}" data-f="${c}" aria-pressed="${filtro===String(c)}"><span class="ord">${c===0?"×":"0"+c}</span><span class="n">${cnt[c]||0}</span><span class="t">${ST[c].nome}</span></button>`).join("");
@@ -1047,14 +1109,12 @@ function vPainel(){
       <td>${esc(r.acao)||"—"}${canWrite&&r.cod>=1&&r.cod<=5?`<div class="tacts">${r.cod===1&&r.agenda&&!r.rfInfo?`<button class="adv sm" data-rf1="${esc(r.id)}" title="Marcar R.F. informado">✓ R.F.</button>`:""}<button class="adv sm" data-adv="${esc(r.id)}" title="Avançar para ${ST[r.cod+1].nome} (hoje)">→ ${ST[r.cod+1].nome}</button></div>`:""}</td><td><span class="alert">${r.alerta}</span>${filtro==="pend"?`<div class="small pendtx">${pendDe(r).join(" · ")}</div>`:""}</td><td class="small">${esc(r.obs)}</td></tr>`;
   return `<section class="prod" aria-label="Cargas para produção"><div class="in">
       <div class="prodhead"><h2>Cargas para produção${galpaoF?" · "+(galpaoF==="__sem"?"sem galpão":"Galpão "+esc(galpaoF)):""}</h2>
-      <div class="rule"><span>Regra: entrar no cronograma até</span>${canAdmin?`<span class="rg" role="group" aria-label="Dias úteis antes da agenda"><button data-regra="-1" aria-label="Diminuir um dia" ${cfg.regraDias<=1||salvandoRegra?"disabled":""}>−</button><output aria-live="polite">${cfg.regraDias}</output><button data-regra="1" aria-label="Aumentar um dia" ${cfg.regraDias>=20||salvandoRegra?"disabled":""}>+</button></span><b>${cfg.regraDias===1?"dia útil":"dias úteis"} antes da agenda</b>`:`<b>${pl(cfg.regraDias,"dia útil","dias úteis")} antes da agenda</b>`}<span>· Informar R.F.</span>${canAdmin?`<span class="rg" role="group" aria-label="Dias úteis antes do cronograma para informar R.F."><button data-rf="-1" aria-label="Diminuir um dia" ${cfg.rfDias<=0||salvandoRegra?"disabled":""}>−</button><output aria-live="polite">${cfg.rfDias}</output><button data-rf="1" aria-label="Aumentar um dia" ${cfg.rfDias>=10||salvandoRegra?"disabled":""}>+</button></span><b>${cfg.rfDias===1?"dia útil":"dias úteis"} antes do cronograma</b>`:`<b>${pl(cfg.rfDias,"dia útil","dias úteis")} antes do cronograma</b>`}${cfg.regraTerca?`<span class="tercatag" title="Agenda na terça: R.F. na sexta anterior e cronograma até o sábado">· Agenda de terça: R.F. na sexta</span>`:""}<span>· d.u. = dias úteis${canWrite?" · clique no número da carga para mudar o status":""}</span></div></div>
+      <button class="btn ghost sm" data-cols="${todasAb?"fechar":"abrir"}">${todasAb?"Recolher todas":"Mostrar todas"}</button></div>
       ${hero}${avisoAgenda}<div class="cols">${prodCols}${envCol}</div></div></section>
     <div class="in main">
       <section aria-label="Fluxo das cargas"><div class="pipehead"><h2>Fluxo das cargas</h2><span class="small">clique numa etapa para filtrar a fila</span></div>
         <div class="pipe">${[1,2,3,4,5,6].map((c,i)=>`<button class="pn ${cnt[c]?"":"zero"}" style="${cv(c)}" data-f="${c}" aria-pressed="${filtro===String(c)}" aria-label="${ST[c].nome}: ${cnt[c]||0}"><span class="ring"><b>${cnt[c]||0}</b></span><span class="pl">${ST[c].nome}</span></button>${i<5?`<span class="pt ${cnt[c]?"":"parado"}" style="--a:var(${ST[c].c});--b:var(${ST[c+1].c})" aria-hidden="true"><i></i><i></i><i></i></span>`:""}`).join("")}</div>
         ${cnt[0]?`<div class="pipex"><button class="chip" data-f="0" aria-pressed="${filtro==="0"}">${ST[0].nome}: ${cnt[0]}</button></div>`:""}</section>
-      ${pend.length?(()=>{const c={};pend.forEach(r=>pendDe(r).forEach(t=>{c[t]=(c[t]||0)+1;}));
-        return `<section class="pendbox" aria-label="Pendências de cadastro"><div><span class="label">Pendências de cadastro</span><div class="pendl">${Object.entries(c).map(([t,n])=>`<span class="ctag mini">${n} ${esc(t)}</span>`).join("")}</div></div><button class="btn ghost sm" data-f="pend" ${filtro==="pend"?'aria-pressed="true"':""}>Ver as ${pl(pend.length,"carga")}</button></section>`;})():""}
       <section style="display:grid;gap:10px">
         <div class="bar fila"><div class="label">Fila de acompanhamento · críticas primeiro</div><div class="chips">${chips}</div></div>
         <div class="tablebox"><table class="t"><thead><tr><th class="w"><input type="checkbox" id="selall" ${visAll?"checked":""} ${visSome&&!visAll?'data-ind="1"':""} aria-label="Selecionar todas desta visão"></th><th>Envio</th><th>Carga</th><th>Galpão</th><th>Loja</th><th>Status</th><th>Roteirização</th><th>Informar R.F.</th><th>Cronograma até</th><th>Agenda ML</th><th class="num">Paletes</th><th>Ação</th><th>Alerta</th><th>Obs.</th></tr></thead>
@@ -1888,6 +1948,7 @@ async function pedirNomes(ids,esperar){
 /* ================= eventos ================= */
 document.addEventListener("click",e=>{
   const t=e.target;
+  if(!t.closest("details.mais")||t.closest(".maismenu button")) document.querySelectorAll("details.mais[open]").forEach(d=>d.open=false);
   if(t.closest("[data-tema]")){tema=tema==="auto"?"escuro":tema==="escuro"?"claro":"auto";try{localStorage.setItem("painel-tema",tema);}catch(_){};aplicaVisual();render();return;}
   const kp=t.closest("[data-kpi]"); if(kp){const k=kp.dataset.kpi; if(k==="prox"&&kp.dataset.id){abrir(kp.dataset.id);return;} if(k==="pbr"){location.hash="#paletes";return;}
     filtro=k==="crit"?"crit":k==="prod"?"3":"abertas"; if(view()!=="painel") location.hash="#painel"; else render();
@@ -1895,10 +1956,14 @@ document.addEventListener("click",e=>{
   if(t.closest("#limpabusca")){busca="";render();return;}
   if(t.closest("#senha")&&online){online.trocarSenha();return;}
   const noc=t.closest("[data-novaoc]"); if(noc&&window.PAINEL_EXT){const r=allRows.find(x=>x.id===noc.dataset.novaoc); if(r){fechar();PAINEL_EXT.novaOcorrencia(r);} return;}
-  const g=t.closest("[data-g]"); if(g){galpaoF=galpaoF===g.dataset.g?"":g.dataset.g;render();return;}
+  const g=t.closest("[data-g]"); if(g){galpaoF=g.dataset.g;render();return;}
+  if(!t.closest("details.mais")||t.closest(".maismenu button")) document.querySelectorAll("details.mais[open]").forEach(d=>d.open=false);
   const lj=t.closest("[data-loja]"); if(lj){lojaF=lojaF===lj.dataset.loja?"":lj.dataset.loja;render();return;}
   const op=t.closest("[data-open]"); if(op){abrir(op.dataset.open);return;}
   const adv=t.closest("[data-adv]"); if(adv){avancar(adv.dataset.adv);return;}
+  const vz=t.closest("[data-visao]"); if(vz){visao=vz.dataset.visao;try{localStorage.setItem("painel-visao",visao);}catch(_){}render();return;}
+  const cl=t.closest("[data-col]"); if(cl){const k=cl.dataset.col; colsAbertas.has(k)?colsAbertas.delete(k):colsAbertas.add(k); guardaCols(); render(); return;}
+  const ca=t.closest("[data-cols]"); if(ca){ if(ca.dataset.cols==="abrir") colsAbertas=new Set(["1","2","3","env"]); else colsAbertas.clear(); guardaCols(); render(); return;}
   const rf1=t.closest("[data-rf1]"); if(rf1){const d=docs.get(rf1.dataset.rf1); marcarRF([rf1.dataset.rf1],!(d&&d.rfInfo&&d.rfInfo.em)); return;}
   const xe=t.closest("[data-expenv]"); if(xe){expedirEnvio(xe.dataset.expenv);return;}
   const mg=t.closest("[data-msg]"); if(mg){const r=allRows.find(x=>x.id===mg.dataset.msg); if(r) msgTipo=r.cod===1?"rf":"exp"; if(r) abrirMensagens(r.envio?allRows.filter(x=>x.envio===r.envio&&x.cod!==0):[r]); return;}
@@ -1944,6 +2009,7 @@ document.addEventListener("change",e=>{
   if(t.id==="selall"){lastVis.forEach(r=>t.checked?sel.add(r.id):sel.delete(r.id));render();return;}
   if(t.name==="dst"&&dForm){dForm.status=t.value;document.querySelectorAll(".stopt").forEach(l=>l.classList.toggle("cur",l.querySelector("input").checked));return;}
   if(t.id==="kpimes"){kpiMes=t.value;render();return;}
+  if(t.id==="lojasel"){lojaF=t.value;render();return;}
   if(t.id==="bst"){bulkSt=t.value;return;}
   if(t.id==="bdt"){bulkData=t.value;return;}
   if(t.id==="bag"){bulkAgenda=t.value;return;}
@@ -1974,9 +2040,10 @@ window.addEventListener("hashchange",()=>{render();window.scrollTo(0,0);});
 let tourI=-1, tourPassos=[];
 const TOUR=[
   [".kpis","Cartões do topo","O que está em produção, o que expede hoje, as atrasadas e a próxima carga. Clique num cartão para ir direto à lista."],
+  [".pipe","Fluxo das cargas","Cada círculo é uma etapa. Clique para ver só as cargas dela; clique de novo para voltar."],
   [".tabs","Abas","Painel, Calendário, Indicadores, Ocorrências e Histórico. A busca do topo vale para todas."],
   ["#busca","Busca","Digite o número da carga, do envio, o galpão ou a loja."],
-  [".prod .card","Cartão da carga","Clique no número para ver os detalhes, mudar o status e copiar mensagens prontas. Os botões de baixo avançam a etapa e marcam o R.F. informado."],
+  [".prod .colh","Colunas de produção","Começam recolhidas, mostrando só o que pede atenção. Clique no título para ver as cargas; no cartão, o número abre os detalhes e os botões avançam a etapa ou marcam o R.F. informado."],
   ["#resumo","Resumo do dia","Monta o texto do dia para colar no Teams ou WhatsApp."],
   ['.tabs a[href="#ajuda"]',"Ajuda","Tudo explicado por perfil. O tour pode ser revisto por lá."]];
 const tourChave=()=>"painel-tour-v1-"+(meId||"local");
