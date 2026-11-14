@@ -27,6 +27,25 @@ const mascarar = (e: string) => {
 };
 const escHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 
+// ---------- bloqueio por tentativas (5 erros em 15 minutos = 15 minutos bloqueado) ----------
+const LIMITE = 5, JANELA_MIN = 15;
+// chaves por pessoa: 5 erros; chaves por rede (IP), que pode ser a mesma para o escritório todo: 20 erros
+// deno-lint-ignore no-explicit-any
+async function bloqueado(admin: any, chaves: string[]) {
+  const desde = new Date(Date.now() - JANELA_MIN * 60e3).toISOString();
+  for (const c of chaves) {
+    const { count } = await admin.from("tentativas").select("id", { count: "exact", head: true }).eq("chave", c).gte("em", desde);
+    if ((count ?? 0) >= (c.includes("-ip:") ? (c.startsWith("codigo") ? 10 : 20) : LIMITE)) return true;
+  }
+  return false;
+}
+// deno-lint-ignore no-explicit-any
+const falhou = (admin: any, chaves: string[]) => admin.from("tentativas").insert(chaves.map((chave) => ({ chave })));
+// deno-lint-ignore no-explicit-any
+const limpar = (admin: any, chaves: string[]) => admin.from("tentativas").delete().in("chave", chaves);
+const MSG_BLOQ = "Muitas tentativas erradas. Por segurança, espere 15 minutos e tente de novo.";
+const ipDe = (req: Request) => (req.headers.get("x-forwarded-for") ?? req.headers.get("cf-connecting-ip") ?? "").split(",")[0].trim() || "sem-ip";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return j({ erro: "Método inválido" }, 405);
@@ -34,6 +53,7 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { return j({ erro: "Pedido inválido" }, 400); }
 
   const acao = String(body.acao ?? "");
+  const ip = ipDe(req);
   const admin = createClient(URL_, SERVICE, { auth: { persistSession: false, autoRefreshToken: false } });
   const perfilPorUsuario = async (u: string) =>
     (await admin.from("perfis").select("id, usuario, perfil").eq("usuario_lower", u.toLowerCase()).maybeSingle()).data;
@@ -59,6 +79,9 @@ Deno.serve(async (req) => {
     const REMETENTE = Deno.env.get("BREVO_REMETENTE");
     if (!KEY || !REMETENTE) return j({ erro: "O envio de e-mail ainda não foi configurado. Peça ao Administrador Master para trocar a sua senha." }, 503);
     if (!validoUsuario(usuario)) return j(generico);
+    const kRec = ["recuperar:" + usuario.toLowerCase(), "recuperar-ip:" + ip];
+    if (await bloqueado(admin, kRec)) return j({ erro: "Muitos pedidos de nova senha. Espere 15 minutos e tente de novo." }, 429);
+    await falhou(admin, kRec);
     const p = await perfilPorUsuario(usuario);
     if (!p) return j(generico);
     const { data: u } = await admin.auth.admin.getUserById(p.id);
@@ -96,11 +119,15 @@ Deno.serve(async (req) => {
   const usuario = normUsuario(body.usuario);
   const senha = String(body.senha ?? "");
   if (!validoUsuario(usuario)) return j({ erro: "Nome de usuário inválido: use de 2 a 40 letras ou números." }, 400);
-  if (senha.length < 6) return j({ erro: "A senha precisa ter pelo menos 6 caracteres." }, 400);
+  if (!senha) return j({ erro: "Informe a senha." }, 400);
 
   if (acao === "cadastrar") {
+    const kCod = ["codigo-ip:" + ip];
+    if (await bloqueado(admin, kCod)) return j({ erro: MSG_BLOQ }, 429);
+    if (senha.length < 8) return j({ erro: "A senha precisa ter pelo menos 8 caracteres." }, 400);
     const { data: seg } = await admin.from("segredos").select("valor").eq("chave", "codigo_time_sha256").maybeSingle();
     if (!seg || (await sha256(normCodigo(body.codigo))) !== seg.valor) {
+      await falhou(admin, kCod);
       return j({ erro: "Código do time incorreto. Peça o código ao administrador." }, 403);
     }
     const email = String(body.email ?? "").trim().toLowerCase();
@@ -129,12 +156,15 @@ Deno.serve(async (req) => {
     return j({ erro: "Ação inválida" }, 400);
   }
 
+  const kLog = ["login:" + usuario.toLowerCase(), "login-ip:" + ip];
+  if (await bloqueado(admin, kLog)) return j({ erro: MSG_BLOQ }, 429);
   const perfil = await perfilPorUsuario(usuario);
-  if (!perfil) return j({ erro: "Usuário ou senha incorretos." }, 401);
+  if (!perfil) { await falhou(admin, kLog); return j({ erro: "Usuário ou senha incorretos." }, 401); }
   const { data: u } = await admin.auth.admin.getUserById(perfil.id);
   if (!u?.user?.email) return j({ erro: "Usuário ou senha incorretos." }, 401);
   const pub = createClient(URL_, ANON, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: s, error: e3 } = await pub.auth.signInWithPassword({ email: u.user.email, password: senha });
-  if (e3 || !s?.session) return j({ erro: "Usuário ou senha incorretos." }, 401);
+  if (e3 || !s?.session) { await falhou(admin, kLog); return j({ erro: "Usuário ou senha incorretos." }, 401); }
+  await limpar(admin, ["login:" + usuario.toLowerCase()]);
   return j({ access_token: s.session.access_token, refresh_token: s.session.refresh_token, usuario: perfil.usuario, perfil: perfil.perfil });
 });

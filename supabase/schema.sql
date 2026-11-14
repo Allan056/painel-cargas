@@ -364,3 +364,221 @@ insert into public.cargas_config (chave, valor) values
 
 select cron.schedule('manutencao-diaria', '15 6 * * *', 'select public.manutencao_diaria()');
 select cron.schedule('emails-automaticos', '*/15 * * * *', 'select public.disparar_emails()');
+
+-- =====================================================================
+-- v3 · segurança (só quem tem perfil lê), bloqueio de tentativas, PBR/CHEP, R.F. informado,
+--      controle de paletes PBR, alertas (e-mail e Teams) e backup semanal
+-- O histórico de paletes da planilha antiga é importado à parte (dados reais não vão para o GitHub).
+-- =====================================================================
+-- 1) Segurança: só quem tem perfil no painel lê os dados
+create or replace function public.tem_perfil() returns boolean language sql stable security definer set search_path to '' as $$
+  select exists (select 1 from public.perfis p where p.id = auth.uid()) $$;
+revoke execute on function public.tem_perfil() from public, anon;
+grant execute on function public.tem_perfil() to authenticated;
+
+drop policy if exists time_le on public.perfis;
+create policy time_le on public.perfis for select to authenticated using ((select public.tem_perfil()));
+drop policy if exists time_le on public.cargas;
+create policy time_le on public.cargas for select to authenticated using ((select public.tem_perfil()));
+drop policy if exists time_le on public.cargas_config;
+create policy time_le on public.cargas_config for select to authenticated using ((select public.tem_perfil()));
+drop policy if exists time_le on public.ocorrencias;
+create policy time_le on public.ocorrencias for select to authenticated using ((select public.tem_perfil()));
+drop policy if exists time_le on public.historico;
+create policy time_le on public.historico for select to authenticated using ((select public.tem_perfil()));
+
+-- 2) Tentativas de entrar / criar conta (bloqueio de 15 minutos depois de 5 erros) — só o servidor usa
+create table if not exists public.tentativas (
+  id bigint generated always as identity primary key,
+  chave text not null,
+  em timestamptz not null default now()
+);
+create index if not exists tentativas_chave_idx on public.tentativas (chave, em desc);
+alter table public.tentativas enable row level security;
+revoke all on public.tentativas from anon, authenticated;
+
+-- 3) Cargas: paletes PBR e CHEP, R.F. informado
+alter table public.cargas add column if not exists pbr integer check (pbr is null or pbr >= 0);
+alter table public.cargas add column if not exists chep integer check (chep is null or chep >= 0);
+alter table public.cargas add column if not exists rf_info jsonb;
+
+create or replace function public.hist_cargas() returns trigger language plpgsql security definer set search_path to '' as $$
+declare mud jsonb := '[]'::jsonb; c text; o jsonb; n jsonb;
+begin
+  if tg_op = 'INSERT' then
+    perform public.registrar('carga', new.id, new.carga, new.envio, 'criou', jsonb_build_array(jsonb_build_object('campo','status','de',null,'para',new.status)));
+    return new;
+  elsif tg_op = 'DELETE' then
+    perform public.registrar('carga', old.id, old.carga, old.envio, 'excluiu', '[]'::jsonb);
+    return old;
+  end if;
+  o := to_jsonb(old); n := to_jsonb(new);
+  foreach c in array array['envio','carga','galpao','loja','rot','agenda','volume','pbr','chep','obs','status','rf_info'] loop
+    if (o->c) is distinct from (n->c) then
+      mud := mud || jsonb_build_array(jsonb_build_object('campo',c,'de',o->c,'para',n->c));
+    end if;
+  end loop;
+  if old.arquivado_em is null and new.arquivado_em is not null then
+    perform public.registrar('carga', new.id, new.carga, new.envio, 'arquivou', mud);
+  elsif old.arquivado_em is not null and new.arquivado_em is null then
+    perform public.registrar('carga', new.id, new.carga, new.envio, 'reativou', mud);
+  elsif jsonb_array_length(mud) > 0 then
+    perform public.registrar('carga', new.id, new.carga, new.envio, 'alterou', mud);
+  end if;
+  return new;
+end $$;
+
+-- 4) Configuração de paletes
+alter table public.cargas_config drop constraint if exists cargas_config_chave_check;
+alter table public.cargas_config add constraint cargas_config_chave_check check (chave in ('geral','meta_base','cadastros','resumo','paletes'));
+
+-- 5) Movimentos de paletes (histórico da planilha, retornos registrados no painel e envios de cargas já apagadas)
+create table if not exists public.paletes_mov (
+  id uuid primary key default gen_random_uuid(),
+  tipo text not null check (tipo in ('envio','retorno')),
+  dia date not null,
+  pbr integer not null default 0 check (pbr >= 0),
+  chep integer not null default 0 check (chep >= 0),
+  obs text not null default '',
+  carga text not null default '',
+  envio text not null default '',
+  origem text not null default 'painel' check (origem in ('planilha','painel','arquivo')),
+  por uuid references public.perfis(id) on delete set null,
+  por_nome text,
+  criado_em timestamptz not null default now()
+);
+create index if not exists paletes_mov_dia_idx on public.paletes_mov (dia);
+create index if not exists paletes_mov_por_idx on public.paletes_mov (por);
+
+create or replace function public.paletes_autor() returns trigger language plpgsql security definer set search_path to '' as $$
+declare nome text;
+begin
+  if auth.uid() is not null then
+    select p.usuario into nome from public.perfis p where p.id = auth.uid();
+    new.por := auth.uid(); new.por_nome := nome; new.origem := 'painel'; new.criado_em := now();
+  end if;
+  return new;
+end $$;
+create trigger paletes_mov_autor before insert on public.paletes_mov for each row execute function public.paletes_autor();
+
+create or replace function public.hist_paletes() returns trigger language plpgsql security definer set search_path to '' as $$
+begin
+  if auth.uid() is null then return coalesce(new, old); end if;
+  if tg_op = 'INSERT' then
+    perform public.registrar('paletes', new.id::text, nullif(new.carga,''), nullif(new.envio,''), 'registrou ' || new.tipo || ' de paletes',
+      jsonb_build_array(jsonb_build_object('campo','dia','de',null,'para',new.dia), jsonb_build_object('campo','pbr','de',null,'para',new.pbr), jsonb_build_object('campo','chep','de',null,'para',new.chep)));
+    return new;
+  end if;
+  perform public.registrar('paletes', old.id::text, nullif(old.carga,''), nullif(old.envio,''), 'excluiu ' || old.tipo || ' de paletes',
+    jsonb_build_array(jsonb_build_object('campo','dia','de',old.dia,'para',null), jsonb_build_object('campo','pbr','de',old.pbr,'para',null)));
+  return old;
+end $$;
+create trigger paletes_mov_historico after insert or delete on public.paletes_mov for each row execute function public.hist_paletes();
+
+alter table public.paletes_mov enable row level security;
+create policy time_le on public.paletes_mov for select to authenticated using ((select public.tem_perfil()));
+create policy admin_registra_retorno on public.paletes_mov for insert to authenticated with check ((select public.pode_editar()) and tipo = 'retorno');
+create policy master_apaga on public.paletes_mov for delete to authenticated using ((select public.sou_admin()) and origem = 'painel');
+revoke all on public.paletes_mov from anon;
+grant select, insert, delete on public.paletes_mov to authenticated;
+alter publication supabase_realtime add table public.paletes_mov;
+
+revoke execute on function public.paletes_autor(), public.hist_paletes() from public, anon, authenticated;
+
+-- 6) Rotina da madrugada: guarda os paletes das cargas antes de apagá-las (12 meses) e limpa tentativas antigas
+create or replace function public.manutencao_diaria() returns jsonb language plpgsql security definer set search_path to '' as $$
+declare hoje date := (now() at time zone 'America/Sao_Paulo')::date; n_arq int; n_del int; corte date;
+begin
+  corte := coalesce((select (c.valor->>'corte')::date from public.cargas_config c where c.chave = 'paletes'), date '2026-11-08');
+  update public.cargas set arquivado_em = now()
+   where arquivado_em is null and status in (0,5,6)
+     and coalesce(agenda, (atualizado_em at time zone 'America/Sao_Paulo')::date) < hoje - 60;
+  get diagnostics n_arq = row_count;
+  insert into public.paletes_mov (tipo, dia, pbr, chep, carga, envio, origem, obs)
+  select 'envio', c.agenda, coalesce(c.pbr,0), coalesce(c.chep,0), c.carga, c.envio, 'arquivo', 'Carga apagada do painel depois de 12 meses'
+    from public.cargas c
+   where c.arquivado_em is not null and c.status <> 0 and c.agenda >= corte and coalesce(c.pbr,0) + coalesce(c.chep,0) > 0
+     and coalesce(c.agenda, (c.arquivado_em at time zone 'America/Sao_Paulo')::date) < (hoje - interval '12 months')::date;
+  delete from public.cargas
+   where arquivado_em is not null
+     and coalesce(agenda, (arquivado_em at time zone 'America/Sao_Paulo')::date) < (hoje - interval '12 months')::date;
+  get diagnostics n_del = row_count;
+  delete from public.ocorrencias where status = 'resolvida' and dia < (hoje - interval '12 months')::date;
+  delete from public.historico where em < now() - interval '12 months';
+  delete from public.tentativas where em < now() - interval '2 days';
+  return jsonb_build_object('arquivadas', n_arq, 'apagadas', n_del);
+end $$;
+
+-- 7) Disparo automático: resumo diário, relatório semanal e verificação diária do saldo de PBR
+create or replace function public.disparar_emails() returns text language plpgsql security definer set search_path to '' as $$
+declare
+  cfg jsonb; agora timestamp := now() at time zone 'America/Sao_Paulo';
+  hoje text := to_char(agora, 'YYYY-MM-DD'); hora text := to_char(agora, 'HH24:MI');
+  dow int := extract(isodow from agora)::int;
+  k_cron text; url text := 'https://yqwlxxfwarqnvjeggvvr.supabase.co/functions/v1/resumo'; feito text := '';
+  d jsonb; s jsonb;
+begin
+  select c.valor into cfg from public.cargas_config c where c.chave = 'resumo';
+  select g.valor into k_cron from public.segredos g where g.chave = 'cron_key';
+  if cfg is null or k_cron is null then return 'sem configuração'; end if;
+  d := coalesce(cfg->'diario', '{}'::jsonb); s := coalesce(cfg->'semanal', '{}'::jsonb);
+  if coalesce((d->>'ativo')::boolean, false)
+     and hora >= coalesce(d->>'hora', '07:00')
+     and (coalesce((d->>'fimDeSemana')::boolean, false) or dow <= 5)
+     and coalesce((select g.valor from public.segredos g where g.chave = 'diario_ultimo'), '') <> hoje
+     and coalesce((select g.valor from public.segredos g where g.chave = 'diario_tentativa'), '') <> hoje || ' ' || substr(hora, 1, 2)
+  then
+    insert into public.segredos (chave, valor) values ('diario_tentativa', hoje || ' ' || substr(hora, 1, 2))
+      on conflict (chave) do update set valor = excluded.valor, atualizado_em = now();
+    perform net.http_post(url := url, headers := jsonb_build_object('Content-Type','application/json','x-cron-key', k_cron),
+                          body := '{"acao":"diario"}'::jsonb, timeout_milliseconds := 20000);
+    feito := feito || 'diario ';
+  end if;
+  if coalesce((s->>'ativo')::boolean, false)
+     and dow = coalesce((s->>'diaSemana')::int, 1)
+     and hora >= coalesce(s->>'hora', '08:00')
+     and coalesce((select g.valor from public.segredos g where g.chave = 'semanal_ultimo'), '') <> hoje
+     and coalesce((select g.valor from public.segredos g where g.chave = 'semanal_tentativa'), '') <> hoje || ' ' || substr(hora, 1, 2)
+  then
+    insert into public.segredos (chave, valor) values ('semanal_tentativa', hoje || ' ' || substr(hora, 1, 2))
+      on conflict (chave) do update set valor = excluded.valor, atualizado_em = now();
+    perform net.http_post(url := url, headers := jsonb_build_object('Content-Type','application/json','x-cron-key', k_cron),
+                          body := '{"acao":"semanal"}'::jsonb, timeout_milliseconds := 60000);
+    feito := feito || 'semanal ';
+  end if;
+  -- saldo de PBR: uma verificação por dia, a partir das 07:00 (alerta por e-mail e Teams quando passa do aviso ou do limite)
+  if exists (select 1 from public.cargas_config c where c.chave = 'paletes')
+     and hora >= '07:00'
+     and coalesce((select g.valor from public.segredos g where g.chave = 'paletes_ultimo'), '') <> hoje
+     and coalesce((select g.valor from public.segredos g where g.chave = 'paletes_tentativa'), '') <> hoje || ' ' || substr(hora, 1, 2)
+  then
+    insert into public.segredos (chave, valor) values ('paletes_tentativa', hoje || ' ' || substr(hora, 1, 2))
+      on conflict (chave) do update set valor = excluded.valor, atualizado_em = now();
+    perform net.http_post(url := url, headers := jsonb_build_object('Content-Type','application/json','x-cron-key', k_cron),
+                          body := '{"acao":"paletes"}'::jsonb, timeout_milliseconds := 20000);
+    feito := feito || 'paletes';
+  end if;
+  return coalesce(nullif(btrim(feito), ''), 'nada a fazer');
+end $$;
+revoke execute on function public.manutencao_diaria(), public.disparar_emails() from public, anon, authenticated;
+
+-- 8) Valores iniciais
+insert into public.cargas_config (chave, valor) values ('paletes', jsonb_build_object(
+  'limite', 200, 'aviso', 180, 'corte', '2026-11-08',
+  'destinatarios', coalesce((select c.valor->'diario'->'destinatarios' from public.cargas_config c where c.chave = 'resumo'), '[]'::jsonb),
+  'alertaEmail', true, 'alertaTeams', true))
+on conflict (chave) do nothing;
+update public.cargas_config set valor = valor || '{"regraTerca":true}'::jsonb where chave = 'geral' and not (valor ? 'regraTerca');
+update public.cargas_config set valor = jsonb_set(valor || jsonb_build_object('teams', coalesce(valor->'teams', '{"diario":true,"paletes":true}'::jsonb), 'teamsConfigurado', coalesce(valor->'teamsConfigurado', 'false'::jsonb)),
+  '{semanal,backup}', coalesce(valor->'semanal'->'backup', 'true'::jsonb)) where chave = 'resumo';
+
+-- v3 · paletes só para o Administrador Master
+drop policy if exists time_le on public.paletes_mov;
+create policy master_le on public.paletes_mov for select to authenticated using ((select public.sou_admin()));
+drop policy if exists admin_registra_retorno on public.paletes_mov;
+create policy master_registra_retorno on public.paletes_mov for insert to authenticated with check ((select public.sou_admin()) and tipo = 'retorno');
+drop policy if exists time_le on public.cargas_config;
+create policy time_le on public.cargas_config for select to authenticated using ((select public.tem_perfil()) and (chave <> 'paletes' or (select public.sou_admin())));
+drop policy if exists time_le on public.historico;
+create policy time_le on public.historico for select to authenticated
+  using ((select public.tem_perfil()) and ((alvo <> 'paletes' and coalesce(chave,'') <> 'paletes') or (select public.sou_admin())));

@@ -24,16 +24,21 @@ function erroPerm(e){
 /* linha da tabela ↔ documento do painel */
 function docDe(r){
   return {envio:r.envio||"",carga:r.carga,galpao:r.galpao||"",loja:r.loja||"",rot:r.rot||"",agenda:r.agenda||"",
-    volume:(typeof r.volume==="number"?r.volume:null),obs:r.obs||"",status:(typeof r.status==="number"?r.status:1),
+    volume:(typeof r.volume==="number"?r.volume:null),pbr:(typeof r.pbr==="number"?r.pbr:null),chep:(typeof r.chep==="number"?r.chep:null),rfInfo:r.rf_info&&r.rf_info.em?r.rf_info:null,
+    obs:r.obs||"",status:(typeof r.status==="number"?r.status:1),
     hist:Array.isArray(r.hist)?r.hist:[],criadoEm:r.criado_em||"",atualizadoEm:r.atualizado_em||"",atualizadoPor:r.atualizado_por||null};
 }
 const CAMPOS={envio:v=>String(v==null?"":v),carga:v=>String(v==null?"":v),galpao:v=>String(v==null?"":v),loja:v=>String(v==null?"":v),
   rot:v=>v?String(v).slice(0,10):null,agenda:v=>v?String(v).slice(0,10):null,
   volume:v=>(v===null||v===undefined||v==="")?null:(Number.isFinite(Number(v))?Math.round(Number(v)):null),
+  pbr:v=>(v===null||v===undefined||v==="")?null:(Number.isFinite(Number(v))&&Number(v)>=0?Math.round(Number(v)):null),
+  chep:v=>(v===null||v===undefined||v==="")?null:(Number.isFinite(Number(v))&&Number(v)>=0?Math.round(Number(v)):null),
+  rfInfo:v=>v&&v.em?{em:String(v.em),por:v.por||null,porNome:v.porNome||""}:null,
   obs:v=>String(v==null?"":v),status:v=>Number(v),hist:v=>Array.isArray(v)?v:[]};
 function linhaDe(d,completa){
   const o={};
   Object.keys(CAMPOS).forEach(k=>{ if(Object.prototype.hasOwnProperty.call(d,k)) o[k]=CAMPOS[k](d[k]); else if(completa) o[k]=CAMPOS[k](k==="status"?1:undefined); });
+  if("rfInfo" in o){o.rf_info=o.rfInfo;delete o.rfInfo;}
   return o;
 }
 
@@ -123,25 +128,44 @@ async function contas(corpo,token){
   if(!r.ok||j.erro) throw new Error(j.erro||"Não foi possível falar com o servidor. Tente de novo.");
   return j;
 }
+/* página de entrada: apresentação animada da operação + formulário */
+const LOGO_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 20 7.3v9.4L12 21.2 4 16.7V7.3z"/><path d="M4 7.3l8 4.6 8-4.6M12 11.9v9.3"/><circle cx="12" cy="11.9" r="1.6" fill="currentColor"/></svg>';
+const REDE_SVG=`<svg class="rede" viewBox="0 0 560 250" role="img" aria-label="Cargas saindo dos galpões G10 e G20, passando pela expedição e chegando ao Mercado Livre">
+  <defs><radialGradient id="rg" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#22d3ee" stop-opacity=".55"/><stop offset="1" stop-color="#22d3ee" stop-opacity="0"/></radialGradient>
+  <linearGradient id="lg1" x1="0" x2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient><linearGradient id="lg2" x1="0" x2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#4ade80"/></linearGradient></defs>
+  <g class="grade">${Array.from({length:12},(_,i)=>`<line x1="${i*50}" y1="0" x2="${i*50}" y2="250"/>`).join("")}${Array.from({length:6},(_,i)=>`<line x1="0" y1="${i*50}" x2="560" y2="${i*50}"/>`).join("")}</g>
+  <path id="r1" class="rota" d="M70 62 C 160 62, 180 125, 280 125" stroke="url(#lg1)"/>
+  <path id="r2" class="rota" d="M70 188 C 160 188, 180 125, 280 125" stroke="url(#lg1)"/>
+  <path id="r3" class="rota" d="M280 125 C 350 92, 420 92, 490 125" stroke="url(#lg2)"/>
+  ${[["r1",.1],["r1",1.6],["r2",.8],["r2",2.4],["r3",.4],["r3",1.5],["r3",2.6]].map(([r,b])=>`<circle class="pk" r="3.6"><animateMotion dur="3.2s" begin="-${b}s" repeatCount="indefinite" rotate="auto"><mpath href="#${r}"/></animateMotion></circle>`).join("")}
+  ${[[70,62,"G10","#a78bfa"],[70,188,"G20","#a78bfa"],[280,125,"Expedição","#22d3ee"],[490,125,"Mercado Livre","#4ade80"]].map(([x,y,t,c],i)=>`<g class="no"><circle cx="${x}" cy="${y}" r="26" fill="url(#rg)" opacity=".5"><animate attributeName="r" values="18;30;18" dur="3s" begin="${i*.5}s" repeatCount="indefinite"/></circle><circle cx="${x}" cy="${y}" r="9" fill="#060b14" stroke="${c}" stroke-width="2.5"/><circle cx="${x}" cy="${y}" r="3.5" fill="${c}"/><text x="${x}" y="${y+(y<100?-22:y>150?32:-22)}" text-anchor="middle">${t}</text></g>`).join("")}
+</svg>`;
 function telaLogin(sb,msgInicial){
   return new Promise(res=>{
     let el=document.getElementById("login"); if(!el){el=document.createElement("div");el.id="login";document.body.appendChild(el);}
-    let modo="entrar", aviso=msgInicial||"", ok="";
+    let modo="entrar", aviso=msgInicial||"", ok="", erros=0;
     const desenhar=()=>{
-      el.innerHTML=`<form class="lg" autocomplete="on" novalidate>
-        <div class="label">Canais Digitais · Envios Mercado Livre</div>
-        <h1>Painel de Cargas</h1>
+      el.innerHTML=`<div class="land"><section class="lhero">
+        <div class="lbrand"><span class="logo">${LOGO_SVG}</span><span>Painel de Cargas</span><span class="lchip"><i></i>Canais Digitais</span></div>
+        <h1>Cada carga, do roteiro à agenda, em tempo real.</h1>
+        <p class="lsub">A torre de controle dos envios para o Mercado Livre: R.F., cronograma, produção e expedição no mesmo lugar, atualizado para todo o time.</p>
+        ${REDE_SVG}
+      </section>
+      <form class="lg" autocomplete="on" novalidate>
+        <div class="label">Acesso do time</div>
+        <h2>${modo==="cadastrar"?"Criar conta":modo==="recuperar"?"Nova senha":"Entrar"}</h2>
         <div class="seg lgtab" role="tablist"><button type="button" data-m="entrar" aria-pressed="${modo==="entrar"}">Entrar</button><button type="button" data-m="cadastrar" aria-pressed="${modo==="cadastrar"}">Criar conta</button></div>
         <p class="small">${modo==="recuperar"?"Informe seu usuário. Enviamos um link para o e-mail cadastrado para você criar uma nova senha.":modo==="cadastrar"?"Peça o código do time ao Administrador Master.":"Entre com seu usuário e senha."}</p>
         <label>Usuário<input name="usuario" autocomplete="username" required maxlength="40"></label>
         ${modo==="cadastrar"?`<label>E-mail<input type="email" name="email" autocomplete="email" required></label>`:""}
-        ${modo!=="recuperar"?`<label>Senha<input type="password" name="senha" autocomplete="${modo==="cadastrar"?"new-password":"current-password"}" required minlength="6"></label>`:""}
+        ${modo!=="recuperar"?`<label>Senha${modo==="cadastrar"?" (mínimo de 8 caracteres)":""}<input type="password" name="senha" autocomplete="${modo==="cadastrar"?"new-password":"current-password"}" required ${modo==="cadastrar"?'minlength="8"':""}></label>`:""}
         ${modo==="cadastrar"?`<label>Código do time<input name="codigo" autocomplete="off" required></label>`:""}
         <div class="lgmsg" role="alert">${esc(aviso)}</div>${ok?`<div class="lgok" role="status">${esc(ok)}</div>`:""}
         <button class="btn" type="submit">${modo==="entrar"?"Entrar":modo==="cadastrar"?"Criar conta":"Enviar link"}</button>
         ${modo==="entrar"?`<button type="button" class="lglink" data-m="recuperar">Esqueci minha senha</button>`:modo==="recuperar"?`<button type="button" class="lglink" data-m="entrar">Voltar para entrar</button>`:""}
         ${modo==="cadastrar"?`<p class="small">Toda conta nova começa como Visualizador. O Administrador Master libera quem pode alterar.</p>`:""}
-      </form>`;
+        ${erros>=2&&modo!=="recuperar"?`<p class="lalerta" role="alert"><b>Atenção:</b> ${erros>=5?"o acesso pode estar bloqueado por 15 minutos.":`depois de 5 tentativas erradas o acesso fica bloqueado por 15 minutos. Já foram ${erros}.`} Se esqueceu a senha, use <b>Esqueci minha senha</b>.</p>`:""}
+      </form></div>`;
       const f=el.querySelector("form");
       el.querySelectorAll("[data-m]").forEach(b=>b.addEventListener("click",()=>{const u=f.usuario.value;modo=b.dataset.m;aviso="";ok="";desenhar();el.querySelector("form").usuario.value=u;}));
       setTimeout(()=>{const x=f.usuario.value?(f.senha||f.usuario):f.usuario;x.focus();},30);
@@ -149,6 +173,7 @@ function telaLogin(sb,msgInicial){
         const bt=f.querySelector('button[type="submit"]'), msg=f.querySelector(".lgmsg");
         const usuario=f.usuario.value.trim(), senha=f.senha?f.senha.value:"";
         if(!usuario||(modo!=="recuperar"&&!senha)){msg.textContent="Preencha todos os campos.";return;}
+        if(modo==="cadastrar"&&senha.length<8){msg.textContent="A senha precisa ter pelo menos 8 caracteres.";return;}
         bt.disabled=true; const txt=bt.textContent; bt.textContent="Aguarde…"; msg.textContent="";
         try{
           if(modo==="recuperar"){const r=await contas({acao:"recuperar",usuario}); ok=r.mensagem||"Enviamos o link para o seu e-mail."; aviso=""; desenhar(); el.querySelector("form").usuario.value=usuario; return;}
@@ -157,7 +182,9 @@ function telaLogin(sb,msgInicial){
           const {data,error}=await sb.auth.setSession({access_token:r.access_token,refresh_token:r.refresh_token});
           if(error) throw error;
           el.hidden=true; document.documentElement.classList.remove("semlogin"); res(data.session);
-        }catch(e){bt.disabled=false;bt.textContent=txt;msg.textContent=(e&&e.message)||"Não foi possível concluir.";}
+        }catch(e){const m=(e&&e.message)||"Não foi possível concluir.";
+          if(/incorret|tentativas/i.test(m)){erros++;aviso=m;const u=f.usuario.value;desenhar();const f2=el.querySelector("form");f2.usuario.value=u;if(f2.senha){f2.senha.focus();}return;}
+          bt.disabled=false;bt.textContent=txt;msg.textContent=m;}
       });
     };
     el.hidden=false; document.documentElement.classList.add("semlogin"); desenhar();
@@ -168,14 +195,14 @@ function telaNovaSenha(sb,hash){
   return new Promise(res=>{
     let el=document.getElementById("login"); if(!el){el=document.createElement("div");el.id="login";document.body.appendChild(el);}
     el.hidden=false; document.documentElement.classList.add("semlogin");
-    el.innerHTML=`<form class="lg" novalidate><div class="label">Canais Digitais · Envios Mercado Livre</div><h1>Criar nova senha</h1>
-      <label>Nova senha<input type="password" name="s1" autocomplete="new-password" minlength="6" required></label>
-      <label>Repita a nova senha<input type="password" name="s2" autocomplete="new-password" minlength="6" required></label>
+    el.innerHTML=`<form class="lg solo" novalidate><div class="lbrand"><span class="logo">${LOGO_SVG}</span><span>Painel de Cargas</span></div><h2>Criar nova senha</h2>
+      <label>Nova senha (mínimo de 8 caracteres)<input type="password" name="s1" autocomplete="new-password" minlength="8" required></label>
+      <label>Repita a nova senha<input type="password" name="s2" autocomplete="new-password" minlength="8" required></label>
       <div class="lgmsg" role="alert"></div><button class="btn" type="submit">Salvar e entrar</button></form>`;
     const f=el.querySelector("form"), msg=f.querySelector(".lgmsg"), bt=f.querySelector("button");
     f.s1.focus();
     f.addEventListener("submit",async ev=>{ev.preventDefault();
-      if(f.s1.value.length<6){msg.textContent="A senha precisa ter pelo menos 6 caracteres.";return;}
+      if(f.s1.value.length<8){msg.textContent="A senha precisa ter pelo menos 8 caracteres.";return;}
       if(f.s1.value!==f.s2.value){msg.textContent="As duas senhas não são iguais.";return;}
       bt.disabled=true; msg.textContent="";
       const v=await sb.auth.verifyOtp({token_hash:hash,type:"recovery"});
@@ -194,13 +221,13 @@ function janela(titulo,html){
   return {el,fechar};
 }
 function trocarSenha(sb){
-  const j=janela("Trocar senha",`<form class="jform" novalidate><label>Nova senha<input type="password" name="s1" autocomplete="new-password" minlength="6"></label>
-    <label>Repita a nova senha<input type="password" name="s2" autocomplete="new-password" minlength="6"></label>
+  const j=janela("Trocar senha",`<form class="jform" novalidate><label>Nova senha (mínimo de 8 caracteres)<input type="password" name="s1" autocomplete="new-password" minlength="8"></label>
+    <label>Repita a nova senha<input type="password" name="s2" autocomplete="new-password" minlength="8"></label>
     <div class="lgmsg" role="alert"></div><div class="mfoot"><button type="button" class="btn ghost" data-jx>Cancelar</button><button class="btn" type="submit">Salvar senha</button></div></form>`);
   j.el.querySelectorAll("[data-jx]").forEach(b=>b.onclick=j.fechar);
   const f=j.el.querySelector("form"), msg=f.querySelector(".lgmsg"); f.s1.focus();
   f.addEventListener("submit",async ev=>{ev.preventDefault();
-    if(f.s1.value.length<6){msg.textContent="A senha precisa ter pelo menos 6 caracteres.";return;}
+    if(f.s1.value.length<8){msg.textContent="A senha precisa ter pelo menos 8 caracteres.";return;}
     if(f.s1.value!==f.s2.value){msg.textContent="As duas senhas não são iguais.";return;}
     const {error}=await sb.auth.updateUser({password:f.s1.value});
     if(error){msg.textContent="Não foi possível salvar: "+error.message;return;}
@@ -211,17 +238,22 @@ function trocarSenha(sb){
 const CAMPO_NOME={envio:"Envio",carga:"Carga",galpao:"Galpão",loja:"Loja destino",rot:"Roteirização",agenda:"Agenda",volume:"Paletes",obs:"Observação",status:"Status",
   tipo:"Tipo",descricao:"Descrição",solucao:"Solução",dia:"Dia",perfil:"Perfil",equipe:"Equipe",funcao:"Função",usuario:"Usuário",
   regraDias:"Dias úteis antes da agenda",rfDias:"R.F. antes do cronograma",atencaoDias:"Dias de atenção",feriadosExtras:"Feriados extras",
-  equipes:"Equipes",funcoes:"Funções",lojas:"Lojas destino",galpoes:"Galpões",tiposOcorrencia:"Tipos de ocorrência",diario:"Resumo diário",semanal:"Relatório semanal"};
-const ALVO_NOME={carga:"Cargas",ocorrencia:"Ocorrências",perfil:"Usuários",regras:"Regras",cadastro:"Cadastro",emails:"E-mails"};
+  equipes:"Equipes",funcoes:"Funções",lojas:"Lojas destino",galpoes:"Galpões",tiposOcorrencia:"Tipos de ocorrência",diario:"Resumo diário",semanal:"Relatório semanal",
+  pbr:"Paletes PBR",chep:"Paletes CHEP",rf_info:"R.F. informado",regraTerca:"Regra da terça",limite:"Limite de PBR",aviso:"Aviso de PBR",corte:"Data de corte",destinatarios:"Quem recebe",
+  alertaEmail:"Alerta por e-mail",alertaTeams:"Alerta no Teams",teams:"Teams",teamsConfigurado:"Teams configurado"};
+const ALVO_NOME={carga:"Cargas",ocorrencia:"Ocorrências",paletes:"Paletes",perfil:"Usuários",regras:"Regras",cadastro:"Cadastro",emails:"E-mails e alertas"};
 const DIAS_SEM=["","segunda","terça","quarta","quinta","sexta","sábado","domingo"];
 function valorTxt(campo,v){
   if(v==null||v==="") return "—";
   if(campo==="status"){const st=API().ST; return st&&st[v]?st[v].nome:String(v);}
   if(campo==="perfil") return PERFIL_NOME[v]||String(v);
+  if(campo==="rf_info") return v&&v.em?"informado em "+dtHora(v.em):"—";
+  if(typeof v==="boolean") return v?"sim":"não";
   if(["rot","agenda","dia"].includes(campo)) return brA(v);
   if(Array.isArray(v)) return v.map(x=>typeof x==="object"?(x.codigo?x.codigo+(x.nome?" "+x.nome:""):JSON.stringify(x)):String(x)).join(", ")||"—";
   if(typeof v==="object"){
-    if(campo==="diario"||campo==="semanal") return (v.ativo?"ativo":"desligado")+(v.hora?" · "+v.hora:"")+(v.diaSemana?" · "+DIAS_SEM[v.diaSemana]:"")+(Array.isArray(v.destinatarios)?" · "+v.destinatarios.join(", "):"");
+    if(campo==="diario"||campo==="semanal") return (v.ativo?"ativo":"desligado")+(v.hora?" · "+v.hora:"")+(v.diaSemana?" · "+DIAS_SEM[v.diaSemana]:"")+(Array.isArray(v.destinatarios)?" · "+v.destinatarios.join(", "):"")+(v.backup===false?" · sem backup":v.backup?" · com backup":"");
+    if(campo==="teams") return "resumo "+(v.diario!==false?"sim":"não")+" · paletes "+(v.paletes!==false?"sim":"não");
     return JSON.stringify(v);
   }
   return String(v);
@@ -230,7 +262,8 @@ function valorTxt(campo,v){
 function criarExt(sb,info){
   const eu=info.uid, master=info.master, pode=info.pode;
   const E={ocs:[],ocsOk:false,perfis:[],perfisOk:false,hist:[],histOk:false,histDias:7,histPessoa:"",histAlvo:"",
-    ocFiltro:"abertas",ocForm:null,resolvendo:null,cad:null,resumo:null,cfgOk:false,msg:{}};
+    ocFiltro:"abertas",ocForm:null,resolvendo:null,cad:null,resumo:null,cfgOk:false,msg:{},
+    pal:{mov:[],arq:[],cfg:null,ok:false,filtro:"todos",verTodos:false,cfgAberta:false},online:[]};
   const raiz={}; let pendente=new Set();
   const cadastros=()=>Object.assign({equipes:[],funcoes:[],lojas:[],galpoes:[],tiposOcorrencia:["Outros"]},E.cad||{});
   const redesenhar=v=>{ if(!raiz[v]||!raiz[v].isConnected) return;
@@ -246,9 +279,16 @@ function criarExt(sb,info){
   async function carregarHist(){const desde=new Date(Date.now()-E.histDias*864e5).toISOString();
     const {data,error}=await sb.from("historico").select("*").gte("em",desde).order("em",{ascending:false}).limit(3000);
     if(!error){E.hist=data||[];E.histOk=true;} redesenhar("historico");}
-  async function carregarCfg(){const {data,error}=await sb.from("cargas_config").select("chave,valor").in("chave",["cadastros","resumo"]);
-    if(!error){(data||[]).forEach(r=>{if(r.chave==="cadastros")E.cad=r.valor||{};if(r.chave==="resumo")E.resumo=r.valor||{};});E.cfgOk=true;}
-    redesenhar("cadastro"); redesenhar("ocorrencias"); API().rerender&&API().rerender();}
+  async function carregarCfg(){const {data,error}=await sb.from("cargas_config").select("chave,valor").in("chave",["cadastros","resumo","paletes"]);
+    if(!error){(data||[]).forEach(r=>{if(r.chave==="cadastros")E.cad=r.valor||{};if(r.chave==="resumo")E.resumo=r.valor||{};if(r.chave==="paletes")E.pal.cfg=r.valor||{};});E.cfgOk=true;}
+    redesenhar("cadastro"); redesenhar("ocorrencias"); carregarPaletes();}
+  async function carregarPaletes(){
+    if(!master) return;
+    const corte=palCfg().corte;
+    const [a,b]=await Promise.all([sb.from("paletes_mov").select("*").order("dia").order("criado_em"),
+      sb.from("cargas").select("id,carga,envio,agenda,pbr,chep,status,arquivado_em").not("arquivado_em","is",null).gte("agenda",corte)]);
+    if(!a.error){E.pal.mov=a.data||[];E.pal.arq=b.error?[]:(b.data||[]);E.pal.ok=true;}
+    redesenhar("paletes"); API().rerender&&API().rerender();}
   carregarOcs(); carregarPerfis(); carregarCfg();
 
   sb.channel("painel-ext")
@@ -258,11 +298,27 @@ function criarExt(sb,info){
       redesenhar("ocorrencias"); API().rerender&&API().rerender();})
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"historico"},pl=>{ if(pl.new&&E.histOk){E.hist.unshift(pl.new); redesenhar("historico");} })
     .on("postgres_changes",{event:"*",schema:"public",table:"perfis"},()=>carregarPerfis())
+    .on("postgres_changes",{event:"*",schema:"public",table:"paletes_mov"},()=>{if(master)carregarPaletes();})
     .on("postgres_changes",{event:"*",schema:"public",table:"cargas_config"},pl=>{ const r=pl.new; if(!r) return;
       if(r.chave==="cadastros"){E.cad=r.valor||{};redesenhar("cadastro");redesenhar("ocorrencias");}
       if(r.chave==="resumo"){E.resumo=r.valor||{};redesenhar("cadastro");}
+      if(r.chave==="paletes"){E.pal.cfg=r.valor||{};redesenhar("paletes");API().rerender&&API().rerender();}
       if(r.chave==="geral") redesenhar("cadastro"); })
     .subscribe();
+
+  /* quem está com o painel aberto agora (presença do Supabase Realtime) */
+  const iniciais=n=>String(n||"?").trim().split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0].toUpperCase()).join("")||"?";
+  const corDe=n=>{let h=0;for(const c of String(n))h=(h*31+c.charCodeAt(0))>>>0;return ["#2f6fdc","#0f8f8a","#7a4fd0","#c2255c","#d9480f","#2b8a3e","#5f3dc4","#1864ab"][h%8];};
+  function presencaHtml(){const outros=E.online.filter(p=>p.uid!==eu);
+    if(!outros.length) return "";
+    return `<span class="on">${outros.length===1?"também online":outros.length+" online"}</span>`+outros.slice(0,6).map(p=>`<span class="av" style="--c:${corDe(p.nome)}" title="${esc(p.nome)} está com o painel aberto">${esc(iniciais(p.nome))}</span>`).join("")+(outros.length>6?`<span class="av" style="--c:#5b6a7d">+${outros.length-6}</span>`:"");}
+  try{
+    const pres=sb.channel("presenca-painel",{config:{presence:{key:eu}}});
+    pres.on("presence",{event:"sync"},()=>{const st=pres.presenceState()||{};const vistos=new Map();
+      Object.entries(st).forEach(([k,l])=>{const x=(l||[])[0];if(x&&x.nome)vistos.set(k,{uid:k,nome:x.nome});});
+      E.online=[...vistos.values()].sort((a,b)=>a.nome.localeCompare(b.nome)); const el=document.getElementById("presenca"); if(el) el.innerHTML=presencaHtml();})
+      .subscribe(async st=>{ if(st==="SUBSCRIBED"){ try{await pres.track({nome:info.nome,desde:new Date().toISOString()});}catch(_){} } });
+  }catch(_){}
 
   const busca=()=>norm((API().busca&&API().busca())||"").trim();
   const cargaPorNumero=c=>(API().cargas?API().cargas():[]).find(r=>String(r.carga)===String(c));
@@ -344,6 +400,77 @@ function criarExt(sb,info){
     E.msg.oc=""; E.ocForm=null; E.ocFiltro="abertas"; await carregarOcs(); API().toast&&API().toast("Ocorrência registrada.");
   }
 
+  /* ---------- Paletes PBR ---------- */
+  const palCfg=()=>Object.assign({limite:200,aviso:180,corte:"2026-11-08",destinatarios:[],alertaEmail:true,alertaTeams:true},E.pal.cfg||{});
+  const MESES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  const mesTxt=ym=>{const [y,m]=ym.split("-");return MESES[+m-1]+"/"+y.slice(2);};
+  const diasEntre=(a,b)=>Math.round((Date.parse(b+"T12:00:00Z")-Date.parse(a+"T12:00:00Z"))/864e5);
+  function calcPal(){
+    if(!E.pal.ok) return null;
+    const c=palCfg(), hoje=hojeIso(), corte=c.corte;
+    const ativas=(API().cargas?API().cargas():[]).filter(r=>r.agenda&&r.agenda>=corte&&r.cod!==0)
+      .map(r=>({tipo:"envio",dia:r.agenda,pbr:r.pbr||0,chep:r.chep||0,carga:r.carga,envio:r.envio,origem:"carga",id:r.id,semPal:r.pbr==null&&r.chep==null}));
+    const ids=new Set(ativas.map(x=>x.id));
+    const arq=E.pal.arq.filter(r=>r.status!==0&&!ids.has(r.id)).map(r=>({tipo:"envio",dia:r.agenda,pbr:r.pbr||0,chep:r.chep||0,carga:r.carga,envio:r.envio,origem:"carga",id:r.id,semPal:r.pbr==null&&r.chep==null}));
+    const todos=E.pal.mov.map(m=>({...m})).concat(ativas,arq).sort((a,b)=>a.dia.localeCompare(b.dia)||(a.tipo===b.tipo?0:a.tipo==="envio"?-1:1));
+    let saldo=0,proj=0,env=0,ret=0,chep=0,ult=null,ultQ=0; const mes=new Map(), futuros=[];
+    todos.forEach(m=>{const ym=m.dia.slice(0,7); if(!mes.has(ym))mes.set(ym,{env:0,ret:0,chep:0,ac:0});const x=mes.get(ym);
+      if(m.tipo==="envio"){ proj+=m.pbr; if(m.dia<=hoje){saldo+=m.pbr;env+=m.pbr;chep+=m.chep;x.env+=m.pbr;x.chep+=m.chep;} else futuros.push(m); }
+      else { saldo-=m.pbr; proj-=m.pbr; ret+=m.pbr; x.ret+=m.pbr; if(m.pbr>0){ if(!ult||m.dia>ult){ult=m.dia;ultQ=0;} if(m.dia===ult) ultQ+=m.pbr; } }});
+    let ac=0; [...mes.keys()].sort().forEach(k=>{const x=mes.get(k); if(k<=hoje.slice(0,7)){ac+=x.env-x.ret;x.ac=ac;} else x.ac=null;});
+    /* quando o saldo passa do aviso e do limite, contando as cargas já agendadas */
+    let corre=saldo, cruzaAviso=null, cruzaLimite=null;
+    futuros.forEach(m=>{corre+=m.pbr; if(!cruzaAviso&&saldo<c.aviso&&corre>=c.aviso) cruzaAviso=m.dia; if(!cruzaLimite&&saldo<c.limite&&corre>=c.limite) cruzaLimite=m.dia;});
+    const nivel=saldo>=c.limite?"limite":saldo>=c.aviso?"aviso":"";
+    const semPal=ativas.filter(m=>m.semPal);
+    return {c,saldo,proj,env,ret,chep,ult,ultQ,dias:ult?diasEntre(ult,hoje):null,nivel,mes,futuros,cruzaAviso,cruzaLimite,todos,semPal,pct:env?Math.round(100*ret/env):null};
+  }
+  function vPaletes(){
+    if(!E.pal.ok) return `<p class="small">Carregando os paletes…</p>`;
+    const p=calcPal(), c=p.c, pct=Math.min(100,Math.round(100*Math.max(0,p.saldo)/c.limite)), q=busca();
+    const fmt=n=>Number(n).toLocaleString("pt-BR");
+    const meses=[...p.mes.entries()].sort((a,b)=>b[0].localeCompare(a[0])).slice(0,8);
+    const maxM=Math.max(1,...meses.map(([,x])=>Math.max(x.env,x.ret)));
+    const lista=p.todos.slice().reverse().filter(m=>(E.pal.filtro==="todos"||m.tipo===E.pal.filtro)&&(!q||norm(m.carga).includes(q)||norm(m.envio).includes(q)||norm(m.obs).includes(q)));
+    const origem=m=>m.origem==="carga"?"carga do painel":m.origem==="planilha"?"planilha (histórico)":m.origem==="arquivo"?"carga já apagada":"registrado no painel";
+    const prox=p.futuros.slice(0,8);
+    return `<div class="palhead">
+      <section class="palsaldo"><span class="label">Saldo de PBR a devolver</span>
+        <div class="n">${fmt(p.saldo)} <small>de ${fmt(c.limite)}</small></div>
+        <div class="palbar ${p.nivel}" role="img" aria-label="${pct}% do limite"><i style="width:${pct}%"></i><b style="left:${Math.min(100,Math.round(100*c.aviso/c.limite))}%" title="Aviso em ${c.aviso}"></b></div>
+        <span class="small">${p.nivel==="limite"?"<b>Limite atingido: hora de pedir o retorno dos PBR ao Mercado Livre.</b>":p.nivel==="aviso"?`<b>Perto do limite</b>: faltam ${fmt(c.limite-p.saldo)} PBR.`:`Faltam ${fmt(c.limite-p.saldo)} PBR para o limite (aviso em ${c.aviso}).`}
+        ${p.proj>p.saldo?` Com as cargas já agendadas, chega a <b>${fmt(p.proj)}</b>${p.cruzaLimite?` e passa do limite em <b>${brA(p.cruzaLimite)}</b>`:p.cruzaAviso?` e passa do aviso em <b>${brA(p.cruzaAviso)}</b>`:""}.`:""}</span></section>
+      <div class="palk"><span class="label">PBR enviados</span><span class="v">${fmt(p.env)}</span><span class="d">desde o início do controle</span></div>
+      <div class="palk"><span class="label">PBR devolvidos</span><span class="v">${fmt(p.ret)}</span><span class="d">${p.pct==null?"—":p.pct+"% dos enviados"}</span></div>
+      <div class="palk"><span class="label">Último retorno</span><span class="v">${p.ult?brA(p.ult).slice(0,5):"—"}</span><span class="d">${p.ult?fmt(p.ultQ)+" PBR · há "+p.dias+" dia"+(p.dias===1?"":"s"):"nenhum registrado"}</span></div>
+      <div class="palk"><span class="label">CHEP enviados</span><span class="v">${fmt(p.chep)}</span><span class="d">não retornam, ficam fora do saldo</span></div>
+    </div>
+    ${p.semPal.length?`<div class="notice">${p.semPal.length===1?"1 carga":p.semPal.length+" cargas"} com agenda a partir de ${brA(c.corte)} ainda sem PBR e CHEP: ${p.semPal.slice(0,12).map(m=>`<button class="lnk" data-open="${esc(m.id)}">${esc(m.carga)}</button>`).join(", ")}. Sem isso, o saldo fica menor do que o real.</div>`:""}
+    <div class="secgrid">
+      ${master?`<form class="sec ocform" data-palret novalidate><h2>Registrar retorno</h2><p class="small">Quando os paletes voltarem do Mercado Livre. Só o PBR entra no saldo.</p>
+        <div class="fgrid"><label>Dia do retorno<input type="date" name="dia" value="${hojeIso()}" max="${hojeIso()}"></label><label>PBR devolvidos<input type="number" name="pbr" min="0" step="1" inputmode="numeric" placeholder="0"></label>
+        <label>CHEP devolvidos (opcional)<input type="number" name="chep" min="0" step="1" inputmode="numeric" placeholder="0"></label><label>Observação<input type="text" name="obs" maxlength="200" placeholder="ex.: coleta no CD"></label></div>
+        <div class="msg" role="alert">${esc(E.msg.pal||"")}</div><div class="mfoot"><button class="btn" type="submit">Registrar retorno</button></div></form>`:""}
+      <section class="sec"><h2>Por mês</h2><div class="palleg"><span style="--c:var(--accent)">enviados</span><span style="--c:var(--ok)">devolvidos</span><span style="--c:transparent">número = saldo no fim do mês</span></div>
+        <div class="palmes">${meses.map(([k,x])=>`<div class="m"><b>${mesTxt(k)}</b><div class="b e" title="${x.env} enviados"><i style="width:${Math.round(100*x.env/maxM)}%"></i></div><div class="b r" title="${x.ret} devolvidos"><i style="width:${Math.round(100*x.ret/maxM)}%"></i></div><span class="mono">${x.ac==null?"—":fmt(x.ac)}</span></div>`).join("")||`<p class="small">Sem movimentos.</p>`}</div></section>
+      <section class="sec"><h2>Próximos envios</h2><p class="small">Cargas agendadas que ainda vão somar ao saldo.</p>
+        ${prox.length?`<table class="s"><thead><tr><th>Agenda</th><th>Carga</th><th class="num">PBR</th></tr></thead><tbody>${prox.map(m=>`<tr><td class="mono">${brA(m.dia).slice(0,5)}</td><td class="mono"><button class="lnk" data-open="${esc(m.id)}">${esc(m.carga)}</button></td><td class="num mono">${m.semPal?'<span class="small">sem PBR</span>':m.pbr}</td></tr>`).join("")}</tbody></table>`:`<p class="small">Nenhuma carga agendada à frente.</p>`}</section>
+    </div>
+    ${master?`<section class="sec"><div class="och"><h2>Alerta de paletes</h2><span class="sp"></span><button class="btn ghost sm" data-palcfg>${E.pal.cfgAberta?"Fechar":"Configurar"}</button></div>
+      <p class="small">Limite <b>${c.limite}</b> · aviso a partir de <b>${c.aviso}</b> · e-mail ${c.alertaEmail?"<b>ligado</b>":"desligado"} para ${c.destinatarios.length?esc(c.destinatarios.join(", ")):"ninguém"} · Teams ${c.alertaTeams?"<b>ligado</b>":"desligado"}${(E.resumo||{}).teamsConfigurado?"":" (falta configurar em Cadastro)"}. O servidor confere o saldo todo dia às 7h e avisa quando passa do aviso e quando chega no limite.</p>
+      ${E.pal.cfgAberta?`<form class="mail" data-palcfgform novalidate><div class="fgrid"><label>Limite de PBR<input type="number" name="limite" min="1" value="${c.limite}"></label><label>Avisar a partir de<input type="number" name="aviso" min="1" value="${c.aviso}"></label></div>
+        <label>Quem recebe o alerta (um e-mail por linha)<textarea name="destinatarios" rows="3">${esc(c.destinatarios.join("\n"))}</textarea></label>
+        <label class="ck"><input type="checkbox" name="alertaEmail" ${c.alertaEmail?"checked":""}>Alerta por e-mail</label><label class="ck"><input type="checkbox" name="alertaTeams" ${c.alertaTeams?"checked":""}>Alerta no canal do Teams</label>
+        <div class="msg" role="status">${esc(E.msg.palcfg||"")}</div><div class="mfoot"><button type="button" class="btn ghost sm" data-teste="paletes">Enviar e-mail de teste</button><button class="btn sm" type="submit">Salvar</button></div></form>`:`<div class="msg" role="status">${esc(E.msg.palcfg||"")}</div>`}</section>`:""}
+    <section class="sec"><div class="och"><h2>Movimentos</h2><span class="sp"></span><div class="chips">${[["todos","Todos"],["envio","Envios"],["retorno","Retornos"]].map(([k,n])=>`<button class="chip" data-palf="${k}" aria-pressed="${E.pal.filtro===k}">${n}</button>`).join("")}</div></div>
+      <div class="tablebox"><table class="t hist"><thead><tr><th>Data</th><th>Movimento</th><th class="num">PBR</th><th class="num">CHEP</th><th>Carga / envio</th><th>Origem</th><th></th></tr></thead><tbody>
+      ${lista.slice(0,E.pal.verTodos?2000:30).map(m=>`<tr><td class="mono">${brA(m.dia)}</td><td>${m.tipo==="envio"?(m.dia>hojeIso()?'<span class="small">Agendado</span>':"Enviado"):"<b>Retorno</b>"}</td><td class="num mono">${m.tipo==="envio"&&m.semPal?'<span class="small">—</span>':m.pbr}</td><td class="num mono">${m.chep||0}</td>
+        <td class="mono">${m.carga?(m.origem==="carga"?`<button class="lnk" data-open="${esc(m.id)}">${esc(m.carga)}</button>`:esc(m.carga)):""}${m.envio?` <span class="small">envio ${esc(m.envio)}</span>`:""}${m.obs&&m.origem!=="planilha"?`<div class="small">${esc(m.obs)}</div>`:""}</td>
+        <td class="small">${origem(m)}${m.por_nome?" · "+esc(m.por_nome):""}</td><td>${master&&m.tipo==="retorno"&&m.origem==="painel"?`<button class="btn danger sm" data-paldel="${esc(m.id)}">Excluir</button>`:""}</td></tr>`).join("")||`<tr><td colspan="7" class="empty">Nenhum movimento${q?" para esta busca":""}.</td></tr>`}
+      </tbody></table></div>${lista.length>30&&!E.pal.verTodos?`<button class="btn ghost sm" data-paltodos>Ver todos os ${lista.length}</button>`:""}
+      <p class="small">Histórico até ${brA(new Date(Date.parse(c.corte+"T12:00:00Z")-864e5).toISOString().slice(0,10))} veio da planilha Paletes_Indicadores. A partir de ${brA(c.corte)}, os envios vêm das cargas do painel (coluna PBR), na data da agenda.</p></section>`;
+  }
+
   /* ---------- Cadastro (Administrador Master) ---------- */
   const chipLista=(chave,itens,cont)=>`<div class="chips">${itens.length?itens.map((x,i)=>`<span class="ctag">${esc(typeof x==="object"?x.codigo+(x.nome?" · "+x.nome:""):x)}${cont?`<span class="n">${cont(x)}</span>`:""}<button class="tx" data-cdel="${chave}" data-i="${i}" aria-label="Remover">×</button></span>`).join(""):`<span class="small">Nenhum cadastrado.</span>`}</div>`;
   const addLinha=(chave,ph,extra)=>`<form class="acrow" data-cadd="${chave}"><input type="text" name="v" placeholder="${esc(ph)}" maxlength="60">${extra||""}<button class="btn sm" type="submit">Adicionar</button></form>`;
@@ -383,11 +510,19 @@ function criarExt(sb,info){
         <div class="mfoot"><button type="button" class="btn ghost sm" data-teste="diario">Enviar teste agora</button><button class="btn sm" type="submit">Salvar</button></div></form>
       <form class="mail" data-mail="semanal"><h3>Relatório semanal de uso</h3><p class="small">Quanto do plano gratuito do Supabase e do Netlify já foi usado. Para os créditos do Netlify aparecerem, cadastre a chave NETLIFY_TOKEN no Supabase (veja a Ajuda).</p>
         <label class="ck"><input type="checkbox" name="ativo" ${s.ativo?"checked":""}>Enviar o relatório semanal</label>
+        <label class="ck"><input type="checkbox" name="backup" ${s.backup!==false?"checked":""}>Anexar o backup da base em Excel (cargas, paletes e ocorrências)</label>
         <div class="fgrid"><label>Dia<select name="diaSemana">${[1,2,3,4,5,6,7].map(n=>`<option value="${n}" ${Number(s.diaSemana)===n?"selected":""}>${DIAS_SEM[n]}</option>`).join("")}</select></label><label>Horário<input type="time" name="hora" value="${esc(s.hora)}"></label></div>
         <label>Quem recebe (um e-mail por linha)<textarea name="destinatarios" rows="3">${esc((s.destinatarios||[]).join("\n"))}</textarea></label>
         <div class="msg" role="status">${esc(E.msg.semanal||"")}</div>
         <div class="mfoot"><button type="button" class="btn ghost sm" data-teste="semanal">Enviar teste agora</button><button class="btn sm" type="submit">Salvar</button></div></form>
       </div></section>
+    <section class="sec"><h2>Microsoft Teams</h2>
+      <p class="small">Manda o resumo das 7h e os alertas de paletes para um canal do Teams. Como ligar: no canal, clique em <b>•••</b> → <b>Workflows</b> → <b>“Post to a channel when a webhook request is received”</b>, escolha a equipe e o canal, e copie o endereço que aparece no final. Cole aqui embaixo.</p>
+      <p><b>${rs.teamsConfigurado?"Teams conectado ✓":"Teams ainda não conectado"}</b>${rs.teamsConfigurado?" · o endereço fica guardado no servidor e não aparece na tela.":""}</p>
+      <form class="acrow" data-teams><input type="text" name="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="${rs.teamsConfigurado?"Cole um novo endereço para trocar":"Cole aqui o endereço do Workflow"}" style="max-width:none"><button class="btn sm" type="submit">Salvar</button></form>
+      <div class="acrow"><label class="ck"><input type="checkbox" data-teamsflag="diario" ${(rs.teams||{}).diario!==false?"checked":""}>Resumo do dia no canal</label><label class="ck"><input type="checkbox" data-teamsflag="paletes" ${(rs.teams||{}).paletes!==false?"checked":""}>Alertas de paletes no canal</label></div>
+      <div class="msg" role="status">${esc(E.msg.teams||"")}</div>
+      ${rs.teamsConfigurado?`<div class="mfoot"><button class="btn ghost sm" data-teamsrem>Desconectar</button><button class="btn sm" data-teamsteste>Enviar teste no canal</button></div>`:""}</section>
     <section class="sec"><h2>Arquivamento automático</h2><p class="small">Toda madrugada o servidor tira do painel as cargas <b>Expedidas, Entregues ou Canceladas</b> com agenda há mais de <b>60 dias</b>. Elas continuam guardadas no banco e são apagadas de vez depois de <b>12 meses</b>, junto com o histórico e as ocorrências resolvidas desse período. Se uma carga arquivada voltar numa base, ela reaparece no painel.</p></section>`;
   }
   async function salvarCad(novo){
@@ -395,6 +530,9 @@ function criarExt(sb,info){
     if(error){API().toast&&API().toast("Não foi possível salvar o cadastro: "+error.message,true);return false;}
     E.cad=novo; desenhar("cadastro"); return true;
   }
+  async function fnResumo(corpo){const {data:{session}}=await sb.auth.getSession();
+    const r=await fetch(CFG.url+"/functions/v1/resumo",{method:"POST",headers:{"Content-Type":"application/json",apikey:CFG.chave,Authorization:"Bearer "+(session&&session.access_token)},body:JSON.stringify(corpo)});
+    const j=await r.json().catch(()=>({})); if(!r.ok||j.erro) throw new Error(j.erro||"Falha ("+r.status+")"); return j;}
   const emailsDe=t=>[...new Set(String(t||"").split(/[\s,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean))];
   const emailOk=x=>/^[^@\s]+@[^@\s.]+(\.[^@\s.]+)*\.[a-z]{2,}$/i.test(x);
 
@@ -413,12 +551,18 @@ function criarExt(sb,info){
         const {error}=await sb.from("ocorrencias").delete().eq("id",dl.dataset.ocdel);if(error)API().toast&&API().toast("Não foi possível excluir: "+error.message,true);else carregarOcs();return;}
       const cd=t.closest("[data-cdel]"); if(cd){const c=cadastros(),k=cd.dataset.cdel,l=(c[k]||[]).slice();l.splice(Number(cd.dataset.i),1);salvarCad({...c,[k]:l});return;}
       if(t.closest("[data-regras]")){API().abrirRegras&&API().abrirRegras();return;}
-      const ts=t.closest("[data-teste]"); if(ts){const tipo=ts.dataset.teste;E.msg[tipo]="Enviando teste…";desenhar("cadastro");
-        try{const {data:{session}}=await sb.auth.getSession();
-          const r=await fetch(CFG.url+"/functions/v1/resumo",{method:"POST",headers:{"Content-Type":"application/json",apikey:CFG.chave,Authorization:"Bearer "+(session&&session.access_token)},body:JSON.stringify({acao:"teste",tipo})});
-          const j=await r.json().catch(()=>({})); if(!r.ok||j.erro) throw new Error(j.erro||"Falha no envio");
-          E.msg[tipo]="Teste enviado para "+(j.para||[]).join(", ")+". Pode levar alguns minutos; veja também o spam.";}
-        catch(err){E.msg[tipo]="Não foi possível enviar: "+err.message;} desenhar("cadastro");return;}
+      const pf=t.closest("[data-palf]"); if(pf){E.pal.filtro=pf.dataset.palf;desenhar("paletes");return;}
+      if(t.closest("[data-paltodos]")){E.pal.verTodos=true;desenhar("paletes");return;}
+      if(t.closest("[data-palcfg]")){E.pal.cfgAberta=!E.pal.cfgAberta;E.msg.palcfg="";desenhar("paletes");return;}
+      const pd=t.closest("[data-paldel]"); if(pd){ if(pd.dataset.conf!=="1"){pd.dataset.conf="1";pd.textContent="Confirmar";return;}
+        const {error}=await sb.from("paletes_mov").delete().eq("id",pd.dataset.paldel); if(error)API().toast&&API().toast("Não foi possível excluir: "+error.message,true); else {API().toast&&API().toast("Retorno excluído.");carregarPaletes();} return;}
+      if(t.closest("[data-teamsteste]")){E.msg.teams="Enviando teste…";desenhar("cadastro");try{await fnResumo({acao:"teams_teste"});E.msg.teams="Teste enviado. Confira o canal do Teams.";}catch(err){E.msg.teams="Não foi possível: "+err.message;}desenhar("cadastro");return;}
+      if(t.closest("[data-teamsrem]")){ const b=t.closest("[data-teamsrem]"); if(b.dataset.conf!=="1"){b.dataset.conf="1";b.textContent="Confirmar: desconectar";return;}
+        try{await fnResumo({acao:"teams_salvar",url:""});E.msg.teams="Teams desconectado.";E.resumo={...(E.resumo||{}),teamsConfigurado:false};}catch(err){E.msg.teams=err.message;} desenhar("cadastro");return;}
+      const ts=t.closest("[data-teste]"); if(ts){const tipo=ts.dataset.teste, chave=tipo==="paletes"?"palcfg":tipo, aba=tipo==="paletes"?"paletes":"cadastro";E.msg[chave]="Enviando teste…";desenhar(aba);
+        try{const j=await fnResumo({acao:"teste",tipo});
+          E.msg[chave]="Teste enviado para "+(j.para||[]).join(", ")+". Pode levar alguns minutos; veja também o spam.";}
+        catch(err){E.msg[chave]="Não foi possível enviar: "+err.message;} desenhar(aba);return;}
     });
     el.addEventListener("change",async e=>{
       const t=e.target;
@@ -431,11 +575,30 @@ function criarExt(sb,info){
         const eq=t.dataset.pequipe?t.value:(p.equipe||""), fn=t.dataset.pfuncao?t.value:(p.funcao||"");
         const {error}=await sb.rpc("definir_equipe_funcao",{alvo:id,nova_equipe:eq,nova_funcao:fn});
         E.msg.perfil=error?"Não foi possível salvar: "+error.message:"Salvo."; carregarPerfis();return;}
+      if(t.matches("[data-teamsflag]")){const atual=E.resumo||{};const novo={...atual,teams:{...(atual.teams||{diario:true,paletes:true}),[t.dataset.teamsflag]:t.checked}};
+        const {error}=await sb.from("cargas_config").update({valor:novo}).eq("chave","resumo"); E.msg.teams=error?"Não foi possível salvar: "+error.message:"Salvo."; if(!error)E.resumo=novo; desenhar("cadastro");return;}
       if(t.name==="carga"&&t.closest("[data-ocform]")){const r=cargaPorNumero(t.value.trim());const f=t.closest("form");if(r&&!f.envio.value)f.envio.value=r.envio||"";return;}
     });
     el.addEventListener("submit",async e=>{
       const f=e.target; e.preventDefault();
       if(f.matches("[data-ocform]")){gravarOc(f);return;}
+      if(f.matches("[data-palret]")){const n=x=>{const v=String(x||"").trim();return v===""?0:Number(v);}; const pbr=n(f.pbr.value), chep=n(f.chep.value);
+        if(!(Number.isInteger(pbr)&&pbr>=0&&Number.isInteger(chep)&&chep>=0)||pbr+chep===0){E.msg.pal="Informe quantos paletes voltaram (número inteiro).";desenhar("paletes");return;}
+        if(!f.dia.value||f.dia.value>hojeIso()){E.msg.pal="Informe o dia do retorno (hoje ou antes).";desenhar("paletes");return;}
+        const bt=f.querySelector('button[type="submit"]'); bt.disabled=true;
+        const {error}=await sb.from("paletes_mov").insert({tipo:"retorno",dia:f.dia.value,pbr,chep,obs:f.obs.value.trim()});
+        if(error){bt.disabled=false;E.msg.pal="Não foi possível registrar: "+(erroPerm(error).code==="invalid_argument"?"seu perfil só visualiza.":error.message);desenhar("paletes");return;}
+        E.msg.pal=""; f.reset(); await carregarPaletes(); API().toast&&API().toast(`Retorno de ${pbr} PBR registrado em ${brA(f.dia.value||hojeIso())}. O saldo já foi atualizado.`);return;}
+      if(f.matches("[data-palcfgform]")){const lim=parseInt(f.limite.value,10), av=parseInt(f.aviso.value,10); const lista=emailsDe(f.destinatarios.value), ruins=lista.filter(x=>!emailOk(x));
+        if(!(lim>0)||!(av>0)||av>lim){E.msg.palcfg="O aviso precisa ser um número menor ou igual ao limite.";desenhar("paletes");return;}
+        if(ruins.length){E.msg.palcfg="E-mail inválido: "+ruins.join(", ");desenhar("paletes");return;}
+        if(lista.length>20){E.msg.palcfg="No máximo 20 e-mails.";desenhar("paletes");return;}
+        const novo={...palCfg(),limite:lim,aviso:av,destinatarios:lista,alertaEmail:f.alertaEmail.checked,alertaTeams:f.alertaTeams.checked};
+        const {error}=await sb.from("cargas_config").update({valor:novo}).eq("chave","paletes");
+        E.msg.palcfg=error?"Não foi possível salvar: "+error.message:"Salvo."; if(!error){E.pal.cfg=novo;E.pal.cfgAberta=false;API().rerender&&API().rerender();} desenhar("paletes");return;}
+      if(f.matches("[data-teams]")){const url=f.url.value.trim(); if(!url){E.msg.teams="Cole o endereço do Workflow.";desenhar("cadastro");return;}
+        E.msg.teams="Salvando…";desenhar("cadastro");
+        try{await fnResumo({acao:"teams_salvar",url});E.resumo={...(E.resumo||{}),teamsConfigurado:true};E.msg.teams="Teams conectado. Clique em Enviar teste no canal para conferir.";}catch(err){E.msg.teams=err.message;} desenhar("cadastro");return;}
       if(f.matches("[data-ocresform]")){const sol=f.solucao.value.trim(); if(!sol){E.msg.res="Conte como foi resolvido.";desenhar("ocorrencias");return;}
         const {error}=await sb.from("ocorrencias").update({status:"resolvida",solucao:sol}).eq("id",f.dataset.ocresform);
         if(error){E.msg.res="Não foi possível salvar: "+error.message;desenhar("ocorrencias");return;}
@@ -452,21 +615,29 @@ function criarExt(sb,info){
         if(lista.length>20){E.msg[tipo]="No máximo 20 e-mails.";desenhar("cadastro");return;}
         const atual=Object.assign({diario:{},semanal:{}},E.resumo||{});
         const novo={...atual,[tipo]:tipo==="diario"?{ativo:f.ativo.checked,hora:f.hora.value||"07:00",fimDeSemana:f.fimDeSemana.checked,destinatarios:lista}
-          :{ativo:f.ativo.checked,diaSemana:Number(f.diaSemana.value)||1,hora:f.hora.value||"08:00",destinatarios:lista}};
+          :{ativo:f.ativo.checked,diaSemana:Number(f.diaSemana.value)||1,hora:f.hora.value||"08:00",backup:f.backup.checked,destinatarios:lista}};
         const {error}=await sb.from("cargas_config").update({valor:novo}).eq("chave","resumo");
         E.msg[tipo]=error?"Não foi possível salvar: "+error.message:"Salvo."+(novo[tipo].ativo?` Próximo envio a partir das ${novo[tipo].hora}.`:" Envio desligado.");
         if(!error)E.resumo=novo; desenhar("cadastro");return;}
     });
   }
   function desenhar(v){ const el=raiz[v]; if(!el) return; pendente.delete(v);
-    el.innerHTML=v==="historico"?vHistorico():v==="ocorrencias"?vOcorrencias():v==="cadastro"?vCadastro():""; }
+    el.innerHTML=v==="historico"?vHistorico():v==="ocorrencias"?vOcorrencias():v==="cadastro"?vCadastro():v==="paletes"?vPaletes():""; }
+  /* formulário com algo digitado não é redesenhado quando o painel atualiza (para não perder o que a pessoa escreveu) */
+  const digitando=el=>[...el.querySelectorAll("input,textarea")].some(i=>i.type!=="checkbox"&&i.type!=="date"&&i.value!==i.defaultValue);
+  let ultimoFoco=null; document.addEventListener("focusin",e=>{ultimoFoco=e.target;});
 
   return {
     montar(v,slot){
       if(!raiz[v]){raiz[v]=document.createElement("div");raiz[v].className="ext ext-"+v;ligar(v,raiz[v]);
         if(v==="historico"&&!E.histOk) carregarHist();}
-      slot.appendChild(raiz[v]); desenhar(v);
+      const foco=ultimoFoco&&raiz[v].contains(ultimoFoco)?ultimoFoco:null;
+      slot.appendChild(raiz[v]);
+      if(digitando(raiz[v])){ if(foco&&foco.isConnected){try{foco.focus({preventScroll:true});}catch(_){}} } else desenhar(v);
     },
+    paletesCfg:()=>palCfg(),
+    paletesSaldo(){if(!master)return null;const p=calcPal(); return p?{saldo:p.saldo,limite:p.c.limite,aviso:p.c.aviso,nivel:p.nivel,proj:p.proj}:null;},
+    presencaHtml,
     ocAbertas(){const s=new Set();E.ocs.forEach(o=>{if(o.status==="aberta"&&o.carga)s.add(String(o.carga));});return s;},
     ocAbertasN(){return E.ocs.filter(o=>o.status==="aberta").length;},
     ocDaCarga(carga){return ocsDe(carga);},
@@ -503,7 +674,7 @@ async function conectar(){
           if(falta.length){const {data}=await sb.from("perfis").select("id,usuario").in("id",falta);(data||[]).forEach(r=>{nomes[r.id]=r.usuario;});}
           const o={};ids.forEach(i=>{if(nomes[i])o[i]={name:nomes[i]};});return o;}
       };
-      window.PAINEL_EXT=criarExt(sb,{uid,master,pode});
+      window.PAINEL_EXT=criarExt(sb,{uid,master,pode,nome:pf.usuario});
       return {db:store.db,user,uid,nome:pf.usuario,perfil:nivel,master,nivel,nivelNome:PERFIL_NOME[nivel]||nivel,podeAlterar:pode,admin:master,
         equipe:pf.equipe||"",funcao:pf.funcao||"",aoVivo:store.aoVivo,
         trocarSenha:()=>trocarSenha(sb),

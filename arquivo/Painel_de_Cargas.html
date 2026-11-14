@@ -8,7 +8,7 @@
 </head>
 <body>
 
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
 <style id="st">
 /* Layout: cabeçalho (galpões, abas, ações) → aba Painel (faixa de produção + status + fila) | Calendário (semana × galpão) | Indicadores (regra 3 d.u., prazos, tempos) → gaveta da carga, janela de importação, barra de seleção */
 :root{
@@ -276,7 +276,7 @@ table.s{border-collapse:collapse;width:100%;font-size:14px}
 /* ===== topo no estilo Gestão de Rotina ===== */
 .topo{background:var(--band);color:var(--band-fg);border-bottom:1px solid var(--band-line);padding-block:16px 18px}
 .topo .label{color:var(--band-muted)}
-.tl{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px 24px}
+.toplinha{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px 24px}
 .marca h1{font-size:32px}
 .marca .sub{font-size:13px;color:var(--band-muted);margin-top:2px}
 .conn{display:grid;justify-items:end;gap:4px;text-align:right}
@@ -360,6 +360,274 @@ input[type=time],input[type=search]{font:14px var(--body);padding:7px 9px;border
 .docl{margin:0;padding:0;list-style:none;display:grid;gap:6px}
 .docl li{border-left:3px solid var(--high);padding:4px 10px;font-size:14px;background:var(--hover);border-radius:0 4px 4px 0}
 .docl li.resolvida{border-left-color:var(--ok)}
+
+/* ===================== v3 · "Torre de controle" =====================
+   Noite azul com grade de pontos, vidro escuro nos painéis, ciano como sinal de ação,
+   âmbar para atenção e o fluxo das cargas animado como peça central. */
+:root:not([data-theme="light"]){
+  --bg:#060b14; --surface:rgba(16,27,46,.72); --surface-solid:#0e1828; --fg:#e8eef8; --muted:#8395b0; --line:rgba(140,170,215,.14); --line-forte:rgba(140,170,215,.24);
+  --accent:#22d3ee; --accent-fg:#04111a; --hover:rgba(34,211,238,.07); --glow:0 0 0 1px rgba(34,211,238,.35),0 0 24px rgba(34,211,238,.18);
+  --band:transparent; --band-fg:#e8eef8; --band-muted:#8395b0; --band-card:rgba(16,27,46,.72); --band-line:rgba(140,170,215,.14);
+  --s1:#94a3b8; --s2:#60a5fa; --s3:#a78bfa; --s4:#2dd4bf; --s5:#fbbf24; --s6:#4ade80; --s0:#64748b;
+  --s1-bg:rgba(148,163,184,.12); --s2-bg:rgba(96,165,250,.13); --s3-bg:rgba(167,139,250,.14); --s4-bg:rgba(45,212,191,.13); --s5-bg:rgba(251,191,36,.13); --s6-bg:rgba(74,222,128,.12); --s0-bg:rgba(100,116,139,.14);
+  --crit:#fb7185; --high:#fb923c; --warn:#fbbf24; --ok:#34d399; --crit-bg:rgba(251,113,133,.12); --warn-bg:rgba(251,191,36,.12); --sel-bg:rgba(34,211,238,.10); --shade:rgba(2,6,12,.66);
+  --solo-tx:#04111a; --cj1:#f472b6; --cj2:#22d3ee; --cj3:#fb923c; --cj4:#a78bfa; --cj5:#4ade80; --cj6:#60a5fa;
+  --display:"Space Grotesk","Segoe UI",system-ui,sans-serif; --body:"Space Grotesk","Segoe UI",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  --r-s:9px; --r-m:14px; --r-l:18px; --sombra:0 1px 0 rgba(255,255,255,.04) inset,0 10px 30px rgba(0,0,0,.25); --sombra-alta:0 24px 60px rgba(0,0,0,.6);
+  --fundo:radial-gradient(1200px 600px at 8% -10%,rgba(34,211,238,.13),transparent 60%),radial-gradient(900px 600px at 105% 20%,rgba(167,139,250,.10),transparent 60%),radial-gradient(rgba(140,170,215,.10) 1px,transparent 1.2px) 0 0/22px 22px,#060b14;
+  color-scheme:dark;
+}
+:root[data-theme="light"],:root[data-visual="claro"]{
+  --bg:#eef3f9; --surface:rgba(255,255,255,.82); --surface-solid:#ffffff; --fg:#0d1a2b; --muted:#5a6c86; --line:rgba(30,60,100,.12); --line-forte:rgba(30,60,100,.22);
+  --accent:#0891b2; --accent-fg:#ffffff; --hover:rgba(8,145,178,.07); --glow:0 0 0 1px rgba(8,145,178,.35),0 6px 20px rgba(8,145,178,.15);
+  --band:transparent; --band-fg:#0d1a2b; --band-muted:#5a6c86; --band-card:rgba(255,255,255,.82); --band-line:rgba(30,60,100,.12);
+  --s1:#64748b; --s2:#2563eb; --s3:#7c3aed; --s4:#0d9488; --s5:#d97706; --s6:#16a34a; --s0:#94a3b8;
+  --s1-bg:#eef2f6; --s2-bg:#e6efff; --s3-bg:#f1eafe; --s4-bg:#e0f6f3; --s5-bg:#fdf3df; --s6-bg:#e4f6ea; --s0-bg:#eef0f3;
+  --crit:#e11d48; --high:#ea580c; --warn:#d97706; --ok:#059669; --crit-bg:#fdecef; --warn-bg:#fdf3df; --sel-bg:#e3f6fb; --shade:rgba(13,26,43,.4); --solo-tx:#fff;
+  --sombra:0 1px 2px rgba(13,26,43,.05),0 8px 24px rgba(13,26,43,.06); --sombra-alta:0 24px 60px rgba(13,26,43,.25);
+  --fundo:radial-gradient(1100px 520px at 0% -10%,rgba(8,145,178,.10),transparent 60%),radial-gradient(rgba(30,60,100,.09) 1px,transparent 1.2px) 0 0/22px 22px,#eef3f9;
+  color-scheme:light;
+}
+html{background:var(--bg)}
+body{background:var(--fundo);background-attachment:fixed;color:var(--fg);font-family:var(--body);-webkit-font-smoothing:antialiased;letter-spacing:-.005em}
+h1,h2,h3{font-family:var(--display);letter-spacing:-.02em}
+.label{font-family:var(--mono);text-transform:uppercase;letter-spacing:.09em;font-size:10.5px;font-weight:600;color:var(--muted)}
+.small,.meta,.k{color:var(--muted)}
+::selection{background:rgba(34,211,238,.3)}
+/* botões e campos */
+.btn{border-radius:var(--r-s);padding:8px 14px;font:600 13.5px var(--body);transition:box-shadow .2s,background .2s,border-color .2s,transform .1s}
+.btn:not(.ghost):not(.danger){background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 92%,#fff),var(--accent));border-color:transparent;box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 28%,transparent)}
+.btn:not(.ghost):not(.danger):hover:not(:disabled){box-shadow:0 8px 26px color-mix(in srgb,var(--accent) 45%,transparent)}
+.btn:active:not(:disabled){transform:translateY(1px)}
+.btn.ghost{background:var(--surface);border-color:var(--line-forte);color:var(--fg);backdrop-filter:blur(8px)}
+.btn.ghost:hover:not(:disabled){border-color:color-mix(in srgb,var(--accent) 60%,transparent);box-shadow:var(--glow);background:var(--surface)}
+.btn.okbtn{background:var(--ok)!important;color:#04111a}
+input[type=text],input[type=date],input[type=number],input[type=time],input[type=search],input[type=email],input[type=password],select,textarea{border-radius:var(--r-s);background:color-mix(in srgb,var(--surface-solid) 85%,transparent);border-color:var(--line-forte);color:var(--fg)}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 28%,transparent)}
+.seg{border-radius:var(--r-s);background:var(--surface);border-color:var(--line-forte)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+.chip{border-radius:999px;padding:5px 12px;background:var(--surface);border-color:var(--line-forte)}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.notice{border-radius:var(--r-s);background:var(--warn-bg);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent)}
+.notice.err{background:var(--crit-bg);border-color:color-mix(in srgb,var(--crit) 35%,transparent)}
+.notice.palalerta{border-left:4px solid var(--warn)} .notice.palalerta.limite{border-left-color:var(--crit);background:var(--crit-bg)}
+.lnk{color:var(--accent)}
+/* vidro */
+.tablebox,.calbox,.panel,.sec,.ajuda,.occ,.ocform,.ocres,.blank,.palsaldo,.palk,.pendbox,.kpi,.card,.hero,.mail{background:var(--surface);border:1px solid var(--line);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:var(--sombra)}
+.tablebox,.calbox,.panel,.sec,.ajuda,.blank,.palsaldo,.palk,.pendbox,.mail{border-radius:var(--r-m)}
+/* ===== topo ===== */
+.topo{background:transparent;border:0;padding-block:20px 6px;position:relative}
+.topo::after{content:none}
+.toplinha{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px 24px}
+.marca{display:flex;align-items:center;gap:14px}
+.marca .logo{width:46px;height:46px;flex:none;border-radius:13px;display:grid;place-items:center;background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 30%,transparent),transparent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);box-shadow:0 0 28px color-mix(in srgb,var(--accent) 25%,transparent)}
+.marca .logo svg{width:26px;height:26px;color:var(--accent)}
+.marca h1{font-size:28px;font-weight:700;line-height:1}
+.marca .sub{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+.conn{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;text-align:right}
+.conn>.label{display:none}
+.conn .cb{gap:8px} .conn .cb b{font-size:14px}
+.conn .cp{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);border-radius:999px;padding:3px 9px}
+.topo .btn.ghost{background:var(--surface);color:var(--fg);border-color:var(--line-forte)}
+.ctl{margin-top:16px;gap:10px}
+.hoje{border-radius:var(--r-s);background:var(--surface);border-color:var(--line-forte);padding:7px 12px}
+.hoje b{font-family:var(--mono)}
+.relogio{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--fg);text-shadow:0 0 18px color-mix(in srgb,var(--accent) 45%,transparent)}
+.vivo{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--ok)}
+.vivo::before{animation:pulso 2s ease-out infinite}
+@keyframes pulso{0%{box-shadow:0 0 0 0 color-mix(in srgb,currentColor 55%,transparent)}100%{box-shadow:0 0 0 9px transparent}}
+.busca,.topo input[type=search].busca{border-radius:var(--r-s);background:var(--surface);border:1px solid var(--line-forte);color:var(--fg);padding:9px 14px 9px 36px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238395b0' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 3.5 3.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:12px 50%}
+.busca::placeholder{color:var(--muted)}
+/* KPIs */
+.kpis{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:16px}
+.kpi{border-radius:var(--r-m);padding:14px 16px 12px;display:grid;grid-template-columns:1fr auto;grid-template-rows:auto 1fr auto;gap:2px 10px;position:relative;overflow:hidden;transition:border-color .2s,box-shadow .2s,transform .2s}
+.kpi::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--kc,var(--accent)),transparent);opacity:.8}
+.kpi:hover{border-color:color-mix(in srgb,var(--kc,var(--accent)) 50%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--kc,var(--accent)) 25%,transparent),0 12px 30px rgba(0,0,0,.3);transform:translateY(-2px)}
+.kpi .label{grid-column:1/-1}
+.kpi .kv{font-family:var(--mono);font-size:34px;font-weight:600;letter-spacing:-.03em;color:var(--fg);align-self:end}
+.kpi .kv .mono{font-size:22px} .kpi .kv small{font-size:14px;color:var(--muted)}
+.kpi .ks{grid-column:1/-1;font-size:12px;color:var(--muted)}
+.kpi .viz{grid-row:2;grid-column:2;align-self:end;display:flex;align-items:flex-end}
+.kpi.crit{--kc:var(--crit)} .kpi.crit .kv{color:var(--crit);text-shadow:0 0 22px color-mix(in srgb,var(--crit) 45%,transparent)}
+.kpi.hl{--kc:var(--warn)} .kpi.hl .kv{color:var(--warn)}
+.kpi.ok{--kc:var(--ok)}
+.spark{display:flex;align-items:flex-end;gap:4px;height:36px}
+.spark i{width:9px;border-radius:2px 2px 0 0;background:color-mix(in srgb,var(--kc,var(--accent)) 45%,transparent);min-height:2px}
+.spark i.on{background:var(--kc,var(--accent));box-shadow:0 0 10px var(--kc,var(--accent))}
+.gauge{width:58px;height:58px}
+.gauge circle{fill:none;stroke-width:6}
+.gauge .tr{stroke:var(--line-forte)} .gauge .vl{stroke:var(--kc,var(--ok));stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dasharray .8s ease;filter:drop-shadow(0 0 4px var(--kc,var(--ok)))}
+.gauge text{font:600 13px var(--mono);fill:var(--fg)}
+/* abas */
+.top{padding-top:4px}
+.tabs{gap:2px;border:1px solid var(--line);border-radius:var(--r-m);background:var(--surface);backdrop-filter:blur(10px);padding:5px;margin-top:16px;width:max-content;max-width:100%;box-shadow:var(--sombra)}
+.tabs a{border:0;border-radius:var(--r-s);padding:8px 14px;font-size:14px;font-weight:600;color:var(--muted);position:relative;transition:color .2s,background .2s}
+.tabs a:hover{color:var(--fg);background:var(--hover)}
+.tabs a[aria-current="page"]{color:var(--fg);background:color-mix(in srgb,var(--accent) 14%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 40%,transparent)}
+.tabs a[aria-current="page"]::after{content:"";position:absolute;left:22%;right:22%;bottom:-6px;height:2px;border-radius:2px;background:var(--accent);box-shadow:0 0 12px var(--accent)}
+.tabs .tabn{background:var(--high);font-family:var(--mono)} .tabs .tabn.aviso{background:var(--warn);color:#04111a} .tabs .tabn.limite{background:var(--crit)}
+.toolbar{margin-top:14px}
+.gch{border-radius:var(--r-s);background:var(--surface);border-color:var(--line-forte)}
+.gch[aria-pressed="true"]{border-color:var(--accent);box-shadow:var(--glow)}
+.gch .g{font-family:var(--mono)}
+/* fluxo das cargas (peça central) */
+.pipe{display:grid;grid-template-columns:auto 1fr auto 1fr auto 1fr auto 1fr auto 1fr auto;align-items:start;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);padding:18px 20px;backdrop-filter:blur(10px);box-shadow:var(--sombra);position:relative;overflow:hidden}
+.pipe::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--accent) 7%,transparent),transparent);transform:translateX(-100%);animation:varre 7s ease-in-out infinite;pointer-events:none}
+@keyframes varre{0%,15%{transform:translateX(-100%)}60%,100%{transform:translateX(100%)}}
+.pipehead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px}
+.pn{all:unset;cursor:pointer;display:grid;justify-items:center;gap:6px;text-align:center;min-width:92px;position:relative;z-index:1}
+.pn .ring{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;border:2px solid color-mix(in srgb,var(--c) 70%,transparent);background:radial-gradient(circle,color-mix(in srgb,var(--c) 22%,transparent),transparent 70%);box-shadow:0 0 22px color-mix(in srgb,var(--c) 30%,transparent);transition:transform .2s,box-shadow .2s}
+.pn .ring b{font:600 22px var(--mono);color:var(--fg)}
+.pn .pl{font-size:12.5px;font-weight:600;color:var(--muted);max-width:110px;line-height:1.2}
+.pn:hover .ring,.pn[aria-pressed="true"] .ring{transform:scale(1.06);box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 22%,transparent),0 0 30px color-mix(in srgb,var(--c) 45%,transparent)}
+.pn[aria-pressed="true"] .pl{color:var(--fg)}
+.pn.zero .ring{opacity:.45;box-shadow:none}
+.pn:focus-visible .ring{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 45%,transparent)}
+.pt{position:relative;height:2px;margin:31px 6px 0;background:linear-gradient(90deg,color-mix(in srgb,var(--a) 60%,transparent),color-mix(in srgb,var(--b) 60%,transparent));border-radius:2px}
+.pt i{position:absolute;top:50%;left:0;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:var(--b);box-shadow:0 0 10px var(--b);opacity:0;animation:flui 3.2s linear infinite}
+.pt i:nth-child(2){animation-delay:1.07s} .pt i:nth-child(3){animation-delay:2.14s}
+.pt.parado i{display:none}
+@keyframes flui{0%{left:0;opacity:0}12%{opacity:1}88%{opacity:1}100%{left:100%;opacity:0}}
+.pipex{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+/* faixa de produção */
+.prod{background:transparent;border:0;padding-block:18px 8px}
+.prod .label{color:var(--muted)}
+.rule{color:var(--muted)} .rule b{color:var(--fg)}
+.rg{border-radius:var(--r-s);background:var(--surface);border-color:var(--line-forte)} .rg button{color:var(--fg)} .rg output{color:var(--fg);font-family:var(--mono)}
+.tercatag{color:var(--warn);font-weight:600}
+.hero{border-radius:var(--r-m);border-left:3px solid var(--hc);box-shadow:var(--sombra),-12px 0 30px -18px var(--hc)}
+.hh .d{font-size:15px}
+.ht td{border-top-color:var(--line)} .ht .big{font-family:var(--mono)}
+.colh{border-top:0;border-bottom:1px solid var(--line);padding:0 0 8px;position:relative}
+.colh::before{content:"";position:absolute;left:0;bottom:-1px;width:44px;height:2px;background:var(--c);box-shadow:0 0 10px var(--c)}
+.colh .n{font-family:var(--mono);font-weight:600;font-size:24px}
+.card{border-radius:12px;border-left:0;padding:12px 14px;position:relative;overflow:hidden;transition:border-color .2s,box-shadow .2s,transform .2s}
+.card::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--ac);box-shadow:0 0 12px var(--ac)}
+.card:hover{border-color:var(--line-forte);transform:translateY(-1px)}
+.card.on{box-shadow:var(--glow)}
+.cg{font-family:var(--mono);font-weight:600}
+.card .env{color:var(--muted)}
+.tag{border-radius:999px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;padding:3px 8px;background:color-mix(in srgb,var(--ac) 18%,transparent);color:var(--ac);border:1px solid color-mix(in srgb,var(--ac) 45%,transparent)}
+.tag.soft{background:transparent}
+.adv{border-radius:999px;padding:4px 11px;font-size:12px;color:var(--fg);border:1px solid var(--line-forte);background:transparent;transition:border-color .2s,box-shadow .2s}
+.adv:hover{border-color:var(--accent);box-shadow:var(--glow)}
+.adv.rfb{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 45%,transparent)}
+.card .r3{gap:6px;flex-wrap:wrap}
+.rfok{color:var(--ok);font-weight:700}
+.envp{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.envbar{flex:1;height:5px;border-radius:3px;background:var(--line-forte);overflow:hidden}
+.envbar i{display:block;height:100%;background:linear-gradient(90deg,var(--s3),var(--s4));border-radius:3px;box-shadow:0 0 8px var(--s4)}
+.envok{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;font-weight:700;color:var(--s4)}
+.card.envc.pronto{border-color:color-mix(in srgb,var(--s4) 45%,transparent);box-shadow:0 0 24px -8px var(--s4)}
+.dot{box-shadow:0 0 8px var(--c)}
+/* conteúdo */
+.main{gap:20px}
+.t th{background:color-mix(in srgb,var(--surface-solid) 92%,transparent);font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;font-size:10.5px;color:var(--muted);border-bottom-color:var(--line-forte);position:sticky;top:0}
+.t td{border-bottom-color:var(--line)}
+.t tbody tr{transition:background .15s} .t tbody tr:hover td{background:var(--hover)}
+.t tr.crit td{background:var(--crit-bg)} .t tr.on td{background:var(--sel-bg)}
+.t tr.closed td{opacity:.6}
+.s th{font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;font-size:10.5px;border-bottom-color:var(--line-forte)} .s td{border-bottom-color:var(--line)}
+.pill{border-radius:999px;padding:3px 10px;border:1px solid color-mix(in srgb,var(--c) 35%,transparent)}
+.alert{font-family:var(--mono);font-size:11.5px}
+.tacts{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px} .tacts .adv{font-size:11px;padding:2px 8px;white-space:nowrap}
+.envok .adv{white-space:nowrap;flex:none}
+.pendbox{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;border-style:dashed;border-color:color-mix(in srgb,var(--high) 45%,transparent);padding:12px 16px}
+.pendl{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pendtx{color:var(--high);font-weight:600;margin-top:3px}
+.ctag{background:var(--surface);border-color:var(--line-forte)}
+.cal>div,.mcal>div{border-color:var(--line)}
+.cal .ch,.cal .rh,.mcal .mh{background:color-mix(in srgb,var(--surface-solid) 70%,transparent)}
+.cal .ch.hoje,.mcal .md.hoje{box-shadow:inset 0 2px 0 var(--accent);background:var(--sel-bg)}
+.cal .cell.hoje{background:var(--sel-bg)}
+.cc{border-radius:7px}
+.kpi .meter,.meter{background:var(--line-forte)}
+.panel .kpi{display:grid}
+footer{color:var(--muted)}
+/* gaveta e janelas */
+.shade,.modal{background:var(--shade);backdrop-filter:blur(6px)}
+.drawer{background:var(--surface-solid);border-left:1px solid var(--line-forte);border-radius:var(--r-l) 0 0 var(--r-l);box-shadow:var(--sombra-alta)}
+.dhead .c{font-family:var(--mono)}
+.stopt{border-radius:var(--r-s);border-color:var(--line-forte)}
+.mbox{background:var(--surface-solid);border:1px solid var(--line-forte);border-radius:var(--r-l);box-shadow:var(--sombra-alta)}
+.mtxt textarea{min-height:280px;font:13px/1.55 var(--mono);white-space:pre-wrap}
+.facts .rfbox{display:flex}
+.rfbox{flex-wrap:wrap;align-items:center;gap:6px 12px;border:1px solid var(--line-forte);border-left:3px solid var(--high);border-radius:var(--r-s);padding:8px 12px}
+.rfbox.ok{border-left-color:var(--ok)} .rfbox .label{flex-basis:100%} .rfbox .btn{flex:none;margin-left:auto}
+.cfter{align-items:flex-start;font-size:13.5px;line-height:1.45;background:var(--hover);border-radius:var(--r-s);padding:10px 12px}
+.cfter input{margin-top:3px}
+.xbar{background:var(--surface-solid);color:var(--fg);border-top:1px solid var(--line-forte);border-radius:var(--r-l) var(--r-l) 0 0;box-shadow:0 -12px 40px rgba(0,0,0,.4)}
+.xbar .btn.ghost{color:var(--fg);border-color:var(--line-forte)} .xbar select,.xbar input{background:var(--surface);color:var(--fg);border-color:var(--line-forte)}
+/* quem está online */
+.presenca{display:inline-flex;align-items:center}
+.presenca .av{width:28px;height:28px;border-radius:50%;display:inline-grid;place-items:center;font:700 10.5px var(--mono);color:#fff;background:var(--c,#5b6a7d);border:2px solid var(--bg);margin-left:-8px;box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 60%,transparent)}
+.presenca .av:first-of-type{margin-left:0}
+.presenca .on{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--ok);margin-right:8px;white-space:nowrap;text-transform:uppercase}
+/* aba Paletes */
+.palhead{display:grid;grid-template-columns:minmax(280px,1.4fr) repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.palsaldo{padding:18px 20px;display:grid;gap:10px;position:relative;overflow:hidden}
+.palsaldo .n{font-family:var(--mono);font-size:54px;font-weight:600;line-height:1;letter-spacing:-.04em}
+.palsaldo .n small{font-size:18px;color:var(--muted);font-weight:500}
+.palbar{position:relative;height:12px;border-radius:6px;background:var(--line-forte);overflow:hidden}
+.palbar i{display:block;height:100%;background:linear-gradient(90deg,var(--s4),var(--ok));border-radius:6px;box-shadow:0 0 14px var(--ok)}
+.palbar.aviso i{background:linear-gradient(90deg,var(--ok),var(--warn));box-shadow:0 0 14px var(--warn)} .palbar.limite i{background:linear-gradient(90deg,var(--warn),var(--crit));box-shadow:0 0 14px var(--crit)}
+.palbar b{position:absolute;top:0;bottom:0;width:2px;background:var(--fg);opacity:.5}
+.palk{padding:14px 16px;display:grid;gap:4px;align-content:start}
+.palk .v{font-family:var(--mono);font-size:28px;font-weight:600;line-height:1.05}
+.palk .d{font-size:12.5px;color:var(--muted)}
+.palmes{display:grid;gap:7px}
+.palmes .m{display:grid;grid-template-columns:62px 1fr 1fr 64px;gap:8px;align-items:center;font-size:13px}
+.palmes .m b{font-family:var(--mono);font-weight:600}
+.palmes .b{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.palmes .b i{display:block;height:100%;border-radius:4px}
+.palmes .e i{background:var(--accent);box-shadow:0 0 8px var(--accent)} .palmes .r i{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.palleg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted)} .palleg span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;background:var(--c)}
+/* tour */
+#tour .tourhl{position:fixed;z-index:70;border-radius:var(--r-m);box-shadow:0 0 0 2px var(--accent),0 0 30px var(--accent),0 0 0 9999px rgba(2,6,12,.72);pointer-events:none;transition:all .25s}
+#tour .tourbox{position:fixed;z-index:71;background:var(--surface-solid);color:var(--fg);border:1px solid var(--line-forte);border-radius:var(--r-m);box-shadow:var(--sombra-alta);padding:16px 18px;display:grid;gap:6px}
+#tour .tourbox h3{font-size:20px} #tour .tourbox p{margin:0;font-size:14px;color:var(--muted)}
+.kpi.tile{all:unset;display:grid;gap:6px;align-content:start;padding:16px 18px;border-radius:var(--r-m);background:var(--surface);border:1px solid var(--line);box-shadow:var(--sombra)}
+.kpi.tile .v{font-family:var(--mono);font-size:34px;font-weight:600;line-height:1}
+.kpi.tile .d{font-size:13px;color:var(--muted)}
+.kpi.tile::before{content:none}
+/* caixas de marcar dentro de formulários: sempre pequenas e na mesma linha do texto */
+.mail label.ck,.ocform label.ck,.fgrid label.ck,.acrow label.ck,.sec label.ck{display:flex;align-items:center;gap:9px;grid-template-columns:none;color:var(--fg);font-size:14px;font-weight:500;line-height:1.35}
+.mail input[type=checkbox],.ocform input[type=checkbox],.acrow input[type=checkbox],.sec input[type=checkbox],.fgrid input[type=checkbox]{width:17px;height:17px;flex:none;max-width:none;padding:0}
+.mail .fgrid{align-items:end}
+input,select,textarea{box-sizing:border-box;max-width:100%}
+/* entrada suave do painel (uma vez) */
+@media (prefers-reduced-motion:no-preference){
+  .kpis .kpi{animation:sobe .55s cubic-bezier(.2,.7,.2,1) both}
+  .kpis .kpi:nth-child(2){animation-delay:.05s}.kpis .kpi:nth-child(3){animation-delay:.1s}.kpis .kpi:nth-child(4){animation-delay:.15s}.kpis .kpi:nth-child(5){animation-delay:.2s}
+  html.ja .kpis .kpi{animation:none}
+}
+@keyframes sobe{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+/* celular */
+@media (max-width:760px){
+  .pipe{grid-template-columns:auto 1fr auto 1fr auto;row-gap:16px;padding:14px}
+  .pipe .pt:nth-of-type(3n){display:none}
+  .pn{min-width:76px} .pn .ring{width:52px;height:52px} .pn .ring b{font-size:18px}
+}
+@media (max-width:640px){
+  body{font-size:14.5px}
+  .topo{padding-block:12px 4px}
+  .marca .logo{width:38px;height:38px;border-radius:11px} .marca h1{font-size:22px} .marca .sub{display:none}
+  .conn .cp{display:none}
+  .ctl{gap:8px;margin-top:10px} .relogio{font-size:17px} .hoje span:last-child{display:none}
+  .busca{flex-basis:100%;max-width:none;order:9}
+  .kpis{grid-template-columns:1fr 1fr;gap:8px;margin-top:12px} .kpis .kpi:last-child:nth-child(odd){grid-column:1/-1} .kpi{padding:11px 12px} .kpi .kv{font-size:26px} .kpi .viz{display:none} .kpi .ks{font-size:11.5px}
+  .tabs{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:16;margin:0;width:auto;border-radius:var(--r-l);padding:5px;gap:2px;background:color-mix(in srgb,var(--surface-solid) 92%,transparent);box-shadow:0 10px 40px rgba(0,0,0,.45)}
+  .tabs a{padding:9px 11px;font-size:13px} .tabs a[aria-current="page"]::after{bottom:2px}
+  .main{padding-bottom:150px}
+  .xbar{bottom:calc(66px + env(safe-area-inset-bottom,0px));border-radius:var(--r-m);left:8px;right:8px}
+  .toolbar .actions{width:100%} .toolbar .actions .btn{flex:1 1 auto}
+  .card{padding:10px 12px;gap:4px} .cg{font-size:17px} .card .r2{font-size:12.5px}
+  .drawer{border-radius:var(--r-l) var(--r-l) 0 0;top:auto;height:92vh;width:100%}
+  .fgrid{grid-template-columns:1fr}
+  .palhead{grid-template-columns:1fr 1fr} .palsaldo{grid-column:1/-1}
+  .palmes .m{grid-template-columns:52px 1fr 1fr 52px}
+}
 </style>
 <div id="app"><div class="in" style="padding-block:40px"><div class="label">Envios Mercado Livre · Controle de carga</div><h1>Painel de Cargas</h1><p class="meta">Carregando as cargas…</p></div></div>
 <input type="file" id="arq" accept=".xlsx,.xls,.xlsm,.csv" hidden>
@@ -394,8 +662,9 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 <script id="main">
 (function(){
 /* ================= configuração ================= */
-const DEF_CFG={regraDias:3,rfDias:1,atencaoDias:2,feriadosExtras:[]};
-function normCfg(c){c=c||{};return {regraDias:Number(c.regraDias)||DEF_CFG.regraDias,rfDias:c.rfDias==null||c.rfDias===""?DEF_CFG.rfDias:Number(c.rfDias),atencaoDias:c.atencaoDias==null?DEF_CFG.atencaoDias:Number(c.atencaoDias),feriadosExtras:Array.isArray(c.feriadosExtras)?c.feriadosExtras:[]};}
+const DEF_CFG={regraDias:3,rfDias:1,atencaoDias:2,feriadosExtras:[],regraTerca:true};
+function normCfg(c){c=c||{};return {regraDias:Number(c.regraDias)||DEF_CFG.regraDias,rfDias:c.rfDias==null||c.rfDias===""?DEF_CFG.rfDias:Number(c.rfDias),atencaoDias:c.atencaoDias==null?DEF_CFG.atencaoDias:Number(c.atencaoDias),feriadosExtras:Array.isArray(c.feriadosExtras)?c.feriadosExtras:[],regraTerca:c.regraTerca!==false};}
+const CORTE_PAL=()=>(window.PAINEL_EXT&&PAINEL_EXT.paletesCfg&&PAINEL_EXT.paletesCfg().corte)||"2026-11-08";
 let cfg={...DEF_CFG};
 const ST={
   1:{nome:"Aguardando cronograma",plan:"AGUARDANDO CRONOGRAMA",c:"--s1"},
@@ -422,10 +691,13 @@ let kpiMes="", buscaT=null;
 let cfgOpen=false, cfgDraft=null, salvandoRegra=false;
 let rows=[], allRows=[], lastVis=[], lastSig=null, lastMeta=null, lastCfg=null;
 const names={}; const askedNames=new Set();
-let tema="auto"; try{tema=localStorage.getItem("painel-tema")||(localStorage.getItem("painel-visual")==="claro"?"claro":"auto");}catch(e){}
+let tema="escuro"; try{tema=localStorage.getItem("painel-tema")||(localStorage.getItem("painel-visual")==="claro"?"claro":"escuro");}catch(e){}
 const TEMA_NOME={auto:"Auto",escuro:"Escuro",claro:"Claro"};
+const LOGO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 20 7.3v9.4L12 21.2 4 16.7V7.3z"/><path d="M4 7.3l8 4.6 8-4.6M12 11.9v9.3"/><circle cx="12" cy="11.9" r="1.6" fill="currentColor"/></svg>';
 function aplicaVisual(){const r=document.documentElement;r.removeAttribute("data-visual");r.removeAttribute("data-theme");
-  if(tema==="escuro") r.setAttribute("data-theme","dark"); else if(tema==="claro"){r.setAttribute("data-theme","light");r.setAttribute("data-visual","claro");}}
+  const claro=tema==="claro"||(tema==="auto"&&window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches);
+  if(claro){r.setAttribute("data-theme","light");r.setAttribute("data-visual","claro");} else r.setAttribute("data-theme","dark");}
+try{matchMedia("(prefers-color-scheme: light)").addEventListener("change",()=>{if(tema==="auto"){aplicaVisual();}});}catch(_){}
 aplicaVisual();
 
 /* ================= utilidades ================= */
@@ -486,10 +758,13 @@ function codTexto(s){ // null = em branco, undefined = não reconhecido
 /* ================= cálculo de cada carga ================= */
 function calc(id,d,hoje){
   const cod=typeof d.status==="number"?d.status:1, ag=dayOf(d.agenda);
-  const lim=ag==null?null:menosUteis(ag,cfg.regraDias);
-  const duLim=lim==null?null:uteisEntre(hoje,lim);
-  const rf=lim==null?null:menosUteis(lim,cfg.rfDias);
+  /* agenda na terça (regra da terça): R.F. exatamente na sexta anterior (ou no dia útil anterior, se for feriado) e cronograma até o sábado da produção */
+  const terca=!!(cfg.regraTerca&&ag!=null&&new Date(ag*864e5).getUTCDay()===2);
+  let lim=null, rf=null;
+  if(ag!=null){ if(terca){lim=ag-3;rf=ag-4;while(!util(rf))rf--;} else {lim=menosUteis(ag,cfg.regraDias);rf=menosUteis(lim,cfg.rfDias);} }
+  const duLim=lim==null?null:uteisEntre(hoje,lim)+(lim>hoje&&!util(lim)?1:0);
   const duRf=rf==null?null:uteisEntre(hoje,rf);
+  const rfInfo=d.rfInfo&&d.rfInfo.em?d.rfInfo:null;
   const duAg=ag==null?null:uteisEntre(hoje,ag);
   const ex=ag==null?null:ag-1; /* expedição: véspera da agenda (entrega na madrugada do dia agendado) */
   let alerta="No prazo",nivel="ok",acao="";
@@ -499,12 +774,14 @@ function calc(id,d,hoje){
   else if(cod>1&&hoje>ex){alerta="Expedição atrasada";nivel="crit";acao="Expedir / reagendar no portal ML";}
   else if(cod===1&&hoje>ag){alerta="Entrega atrasada";nivel="crit";acao="Reagendar no portal ML";}
   else if(cod===1){
-    acao="Incluir no cronograma";
+    acao=rfInfo?"Confirmar a inclusão no cronograma":"Informar R.F. e incluir no cronograma";
     if(hoje>lim){alerta="Fora do prazo do cronograma";nivel="crit";}
     else if(hoje===lim){alerta="Incluir hoje";nivel="high";}
-    else if(hoje===rf){alerta="Informar R.F. hoje";nivel="high";}
-    else if(hoje<rf){if(duRf<=cfg.atencaoDias){alerta="Atenção";nivel="warn";}}
-    else if(duLim<=cfg.atencaoDias){alerta="Atenção";nivel="warn";}
+    else if(rfInfo){alerta="R.F. informado";nivel="ok";}
+    else if(hoje===rf){alerta="Informar R.F. hoje";nivel="high";acao="Informar R.F. hoje";}
+    else if(hoje>rf){alerta="R.F. atrasado";nivel="high";acao="Informar R.F. agora";}
+    else if(terca){alerta=new Date(rf*864e5).getUTCDay()===5?"R.F. só na sexta":"R.F. só em "+br(isoOf(rf));nivel="ok";acao="Informar R.F. em "+br(isoOf(rf))+" ("+wd(rf)+"), não antes";}
+    else if(duRf<=cfg.atencaoDias){alerta="Atenção";nivel="warn";}
   }
   else if(hoje===ex){alerta="Expedir hoje";nivel="high";acao=cod===4?"Expedir hoje":"Finalizar produção e expedir hoje";}
   else if(cod<=3&&uteisEntre(hoje,ex)<=1){alerta="Risco de atraso";nivel="high";acao=cod===2?"Iniciar produção":"Finalizar produção";}
@@ -513,6 +790,7 @@ function calc(id,d,hoje){
   const ref=cod===1?lim:ag;
   const hist=Array.isArray(d.hist)?d.hist:[];
   return {id,envio:String(d.envio||""),carga:String(d.carga||""),galpao:String(d.galpao||""),loja:String(d.loja==null?"":d.loja),rot:d.rot||"",agenda:d.agenda||"",volume:(typeof d.volume==="number"?d.volume:null),obs:d.obs||"",
+    pbr:(typeof d.pbr==="number"?d.pbr:null),chep:(typeof d.chep==="number"?d.chep:null),rfInfo,terca,
     cod,hist,atualizadoEm:d.atualizadoEm||"",atualizadoPor:d.atualizadoPor||null,
     lim:lim==null?"":isoOf(lim),duLim,exp:ex==null?"":isoOf(ex),rf:rf==null?"":isoOf(rf),duRf,duAg,alerta,nivel,acao,key:rank*1e6+(ref==null?99999:ref)};
 }
@@ -544,7 +822,7 @@ function storeLocal(){
 function marcarSujo(v){ if(!modoLocal) return; sujo=v; try{v?localStorage.setItem(KEY_SUJO,"1"):localStorage.removeItem(KEY_SUJO);}catch(_){} }
 
 /* ================= render principal ================= */
-function view(){const h=(location.hash||"").replace("#","");if(["historico","ocorrencias","cadastro"].includes(h)&&!(online&&(h!=="cadastro"||online.master)))return "painel";return ["calendario","indicadores","historico","ocorrencias","cadastro","ajuda"].includes(h)?h:"painel";}
+function view(){const h=(location.hash||"").replace("#","");if(["historico","ocorrencias","cadastro","paletes"].includes(h)&&!(online&&((h!=="cadastro"&&h!=="paletes")||online.master)))return "painel";return ["calendario","indicadores","paletes","historico","ocorrencias","cadastro","ajuda"].includes(h)?h:"painel";}
 function build(){
   const hoje=hojeN();
   allRows=[...docs.entries()].map(([id,d])=>calc(id,d,hoje)).sort((a,b)=>a.key-b.key||a.envio.localeCompare(b.envio)||a.carga.localeCompare(b.carga));
@@ -571,25 +849,29 @@ function render(){
     .concat(gi.map(([g,x])=>`<button class="gch" data-g="${esc(g)}" aria-pressed="${galpaoF===g}"><span class="g">${g==="__sem"?"Sem galpão":esc(g)}</span><span class="gn">${x.ab} em aberto${x.crit?` · <b>${x.crit} crít.</b>`:""}</span></button>`)).join("");
   const metaTxt=meta&&meta.em?`Última base: <b>${esc(meta.arquivo||"planilha")}</b> em <b>${dtHora(meta.em)}</b>${meta.por&&nomeDe(meta.por)?" por <b>"+esc(nomeDe(meta.por))+"</b>":""}`:"Nenhuma base carregada ainda";
   if(meta&&meta.por) pedirNomes([meta.por]);
-  const EXT=["historico","ocorrencias","cadastro"], ehExt=EXT.includes(v)||v==="ajuda";
+  const EXT=["historico","ocorrencias","cadastro","paletes"], ehExt=EXT.includes(v)||v==="ajuda";
+  const pal=window.PAINEL_EXT&&PAINEL_EXT.paletesSaldo?PAINEL_EXT.paletesSaldo():null;
   const ocN=window.PAINEL_EXT&&PAINEL_EXT.ocAbertasN?PAINEL_EXT.ocAbertasN():0;
   const abas=[["painel","Painel"],["calendario","Calendário"],["indicadores","Indicadores"]]
-    .concat(online?[["historico","Histórico"],["ocorrencias","Ocorrências"+(ocN?` <span class="tabn">${ocN}</span>`:"")]]:[])
+    .concat(online&&online.master?[["paletes","Paletes"+(pal&&pal.nivel?` <span class="tabn ${pal.nivel}">!</span>`:"")]]:[]).concat(online?[["ocorrencias","Ocorrências"+(ocN?` <span class="tabn">${ocN}</span>`:"")],["historico","Histórico"]]:[])
     .concat(online&&online.master?[["cadastro","Cadastro"]]:[]).concat([["ajuda","Ajuda"]]);
   const k=kpis();
-  const kcard=(id,l,val,sub,cls,extra)=>`<button class="kpi ${cls||""}" data-kpi="${id}" ${extra||""}><span class="label">${l}</span><span class="kv">${val}</span><span class="ks">${sub}</span></button>`;
+  const kcard=(id,l,val,sub,cls,extra,viz)=>`<button class="kpi ${cls||""}" data-kpi="${id}" ${extra||""}><span class="label">${l}</span><span class="kv">${val}</span>${viz?`<span class="viz">${viz}</span>`:""}<span class="ks">${sub}</span></button>`;
+  const spark=(vals,on,dicas)=>{const m=Math.max(1,...vals);return `<span class="spark" aria-hidden="true">${vals.map((v,i)=>`<i class="${i===on?"on":""}" style="height:${Math.max(6,Math.round(100*v/m))}%" title="${dicas?esc(dicas[i]):""}"></i>`).join("")}</span>`;};
+  const gauge=(pct,txt)=>{const C=2*Math.PI*24;return `<svg class="gauge" viewBox="0 0 58 58" aria-hidden="true"><circle class="tr" cx="29" cy="29" r="24"/><circle class="vl" cx="29" cy="29" r="24" style="stroke-dasharray:${(C*Math.min(1,pct)).toFixed(1)} ${C.toFixed(1)}"/><text x="29" y="33.5" text-anchor="middle">${txt}</text></svg>`;};
   const head=`<div class="topo"><div class="in">
-      <div class="tl"><div class="marca"><h1>Painel de Cargas</h1><div class="sub">Canais Digitais · Envios Mercado Livre${modoLocal?" · arquivo local":retrato?" · retrato":""}</div></div>
-      ${online?`<div class="conn"><span class="label">Conectado como</span><div class="cb"><b>${esc(online.nome)}</b><button class="btn ghost sm" id="senha">Senha</button><button class="btn ghost sm" id="sair">Sair</button></div><span class="cp">${esc(online.nivelNome)}${online.funcao?" · "+esc(online.funcao):""}</span></div>`:""}</div>
+      <div class="toplinha"><div class="marca"><span class="logo" aria-hidden="true">${LOGO}</span><div><h1>Painel de Cargas</h1><div class="sub">Torre de controle · Envios Mercado Livre${modoLocal?" · arquivo local":retrato?" · retrato":""}</div></div></div>
+      ${online?`<div class="conn"><span class="label">Conectado como</span><div class="cb"><span class="presenca" id="presenca">${window.PAINEL_EXT&&PAINEL_EXT.presencaHtml?PAINEL_EXT.presencaHtml():""}</span><b>${esc(online.nome)}</b><button class="btn ghost sm" id="senha">Senha</button><button class="btn ghost sm" id="sair">Sair</button></div><span class="cp">${esc(online.nivelNome)}${online.funcao?" · "+esc(online.funcao):""}</span></div>`:""}</div>
       <div class="ctl"><span class="hoje"><span class="label">Hoje</span><b>${brA(hojeIso())}</b><span>${wd(hojeN())}</span></span>
         ${online?`<span class="relogio" id="relogio">${horaAgora()}</span><span class="vivo ${online.aoVivo()?"":"off"}" id="vivo">${online.aoVivo()?"AO VIVO":"CONECTANDO…"}</span>`:""}
         <button class="btn ghost sm" data-tema="1" title="Auto segue o computador">Tema: ${TEMA_NOME[tema]}</button>
         <input type="search" class="busca" id="busca" placeholder="Buscar carga, envio, galpão, loja…" value="${esc(busca)}" aria-label="Buscar carga ou envio" autocomplete="off"></div>
       ${loaded&&docs.size?`<div class="kpis">
-        ${kcard("prod","Em produção",k.prod,k.prox+" próxima"+(k.prox===1?"":"s")+" a produzir")}
-        ${kcard("exp","Expedir hoje",k.exp,k.expPal?fmtN(k.expPal)+" paletes":"nenhuma carga hoje",k.exp?"hl":"")}
-        ${kcard("crit","Atrasadas",k.crit,k.crit?k.critTxt:"nada fora do prazo",k.crit?"crit":"")}
+        ${kcard("prod","Em produção",k.prod,k.prox+" próxima"+(k.prox===1?"":"s")+" a produzir","",'style="--kc:var(--s3)"',spark([k.n1,k.prox,k.prod],2,["Aguardando cronograma: "+k.n1,"Próximas a produzir: "+k.prox,"Em produção: "+k.prod]))}
+        ${kcard("exp","Expedir hoje",k.exp,k.expPal?fmtN(k.expPal)+" paletes":"nenhuma carga hoje · próximos 7 dias ao lado",k.exp?"hl":"",'style="--kc:var(--warn)"',spark(k.exp7,0,k.exp7d))}
+        ${kcard("crit","Atrasadas",k.crit,k.crit?k.critTxt:"nada fora do prazo",k.crit?"crit":"ok")}
         ${kcard("prox","Próxima",k.pTxt,k.pSub,"",k.pId?`data-id="${esc(k.pId)}"`:"")}
+        ${pal?kcard("pbr","Paletes PBR",`${pal.saldo}<small>/${pal.limite}</small>`,pal.nivel==="limite"?"limite atingido · pedir retorno":pal.nivel==="aviso"?"perto do limite":"a devolver pelo Mercado Livre",pal.nivel==="limite"?"crit":pal.nivel==="aviso"?"hl":"ok","",gauge(pal.saldo/pal.limite,Math.round(100*pal.saldo/pal.limite)+"%")):""}
       </div>`:""}
     </div></div>
     <div class="in top">
@@ -604,6 +886,7 @@ function render(){
       ${modoLocal&&sujo&&docs.size?`<div class="notice"><b>Há mudanças feitas no painel que ainda não estão na planilha.</b> Clique em <b>Baixar base</b> e salve o arquivo na pasta da equipe para que todos vejam.</div>`:""}
       ${modoLocal&&!armazenamentoOk?`<div class="notice err">Este navegador não deixou guardar os dados. O painel funciona, mas ao fechar a página você precisa carregar a base de novo.</div>`:""}
       ${retrato?`<div class="notice">Retrato do painel gerado em <b>${dtHora(retrato.geradoEm)}</b>${retrato.porNome?" por <b>"+esc(retrato.porNome)+"</b>":""}. Somente leitura: os dados não se atualizam.</div>`:""}
+      ${pal&&pal.nivel?`<div class="notice palalerta ${pal.nivel}" role="status"><b>${pal.nivel==="limite"?"Limite de paletes PBR atingido":"Saldo de paletes PBR perto do limite"}: ${pal.saldo} de ${pal.limite}.</b> ${pal.nivel==="limite"?"Hora de pedir o retorno dos PBR ao Mercado Livre.":"Faltam "+Math.max(0,pal.limite-pal.saldo)+" PBR para o limite."} ${v!=="paletes"?`<a class="lnk" href="#paletes">Ver paletes</a>`:""}</div>`:""}
       ${toast?`<div class="notice ${toastErr?"err":""}" role="status">${esc(toast)}</div>`:""}
       ${loadErr?`<div class="notice err">${esc(loadErr)}</div>`:slow&&!loaded?`<div class="notice">Os dados estão demorando para chegar. Verifique sua conexão; a página continua tentando.</div>`:""}
       ${busca.trim()&&!ehExt?`<div class="notice busc">Busca <b>“${esc(busca.trim())}”</b>: ${pl(rows.length,"carga encontrada","cargas encontradas")}. <button class="lnk" id="limpabusca">Limpar busca</button></div>`:""}
@@ -623,6 +906,8 @@ function render(){
   const slot=$("#ext-slot"); if(slot&&window.PAINEL_EXT) PAINEL_EXT.montar(v,slot);
   document.querySelectorAll("[data-ind]").forEach(el=>{el.indeterminate=true;});
   renderXbar(); if(openId) renderDrawerInfo();
+  tourTalvez();
+  if(loaded&&!document.documentElement.classList.contains("ja")) setTimeout(()=>document.documentElement.classList.add("ja"),1500);
 }
 
 /* ---------- aba Ajuda ---------- */
@@ -648,6 +933,8 @@ function vAjuda(){
     ${sec("Prazos (calculados sozinhos)",[
       `<b>Cronograma até</b>: a carga precisa entrar no cronograma ${pl(cfg.regraDias,"dia útil","dias úteis")} antes da agenda.`,
       `<b>Informar R.F.</b>: ${pl(cfg.rfDias,"dia útil","dias úteis")} antes do cronograma.`,
+      cfg.regraTerca?"<b>Agenda na terça</b>: o R.F. é informado <b>na sexta anterior</b>, nunca antes (se a sexta for feriado, no dia útil anterior), e a carga entra no cronograma até o <b>sábado</b>. Assim a produção acontece no fim de semana e a expedição na segunda. Até a sexta, a carga mostra “R.F. só na sexta”.":"A regra da terça está desligada: agendas de terça seguem a regra normal.",
+      "Depois de informar, marque <b>✓ R.F. informado</b> na carga (ou várias de uma vez pela barra de seleção). O alerta some e fica registrado quem marcou e quando.",
       "<b>Expedição</b>: na véspera da agenda, porque a entrega no Mercado Livre é na madrugada do dia agendado.",
       "Dias úteis não contam sábados, domingos, feriados nacionais e os feriados locais cadastrados.",
       "<b>Alertas</b>: Atenção (faltam poucos dias), Informar R.F. hoje, Incluir hoje, Expedir hoje, Risco de atraso e as atrasadas em vermelho."])}
@@ -663,6 +950,18 @@ function vAjuda(){
     ${sec("Calendário e indicadores",[
       "<b>Calendário</b>: semana ou mês, por galpão. Cargas do mesmo envio (conjugadas) têm o selo colorido “⛓ envio · 1/2”; cargas sozinhas, “1/1”.",
       "<b>Indicadores</b>: cumprimento da regra de cronograma, prazos e tempos por mês."])}
+    ${sec("Mensagens prontas e pendências",[
+      "Dentro da carga, <b>Abrir mensagens</b> monta o texto para WhatsApp ou Teams com o envio e as cargas dele: <b>Informar R.F.</b>, <b>Avisar expedição</b> e <b>Reagendamento</b>. Ajuste se quiser e clique em <b>Copiar</b>.",
+      "Com várias cargas marcadas, o botão <b>Mensagem</b> na barra de baixo faz o mesmo para todas.",
+      "<b>Copiar resumo do dia</b> abre o resumo pronto, com o botão Copiar.",
+      "<b>Pendências de cadastro</b> (acima da fila) lista as cargas em aberto sem envio, agenda, galpão, loja ou paletes. Clique para ver só elas.",
+      "No card <b>Por envio</b>, a barra mostra quantas cargas do envio já foram produzidas. Quando todas estão Produzidas, aparece <b>Envio pronto para expedir</b>."])}
+    ${m?sec("Paletes PBR (só você vê)",[
+      "Só o palete <b>PBR</b> volta do Mercado Livre; o CHEP não. A aba <b>Paletes</b> mostra o saldo de PBR enviados ainda não devolvidos, com a barra até o limite.",
+      "O PBR de cada carga conta como enviado na <b>data da agenda</b>. Preencha <b>Paletes PBR</b> e <b>Paletes CHEP</b> na base (colunas da planilha) ou dentro da carga.",
+      "Quando os paletes voltarem, use <b>Registrar retorno</b> na aba Paletes. O saldo cai na hora.",
+      "A aba Paletes, o cartão do saldo e o aviso de limite aparecem só para o Administrador Master. O alerta por e-mail vai para quem você escolher em Paletes → Configurar.",
+      "O histórico até 07/11/2026 veio da planilha Paletes_Indicadores."]):""}
     ${on?sec("Ocorrências",[
       "Problemas como atraso na produção, reagendamento, divergência de paletes ou avaria: clique em <b>+ Registrar ocorrência</b> na aba Ocorrências ou em <b>Registrar ocorrência</b> dentro da carga.",
       "Quando resolver, clique em <b>Resolver</b> e conte como foi resolvido. A carga mostra <b>⚠</b> enquanto houver ocorrência aberta."]):""}
@@ -676,6 +975,9 @@ function vAjuda(){
     ${m?sec("Só para o Administrador Master",[
       "<b>Cadastro → Equipe e perfis</b>: escolha o perfil, a equipe e a função de cada pessoa.",
       "<b>Cadastro → E-mails automáticos</b>: ligue o resumo do dia e o relatório semanal, escolha horário e quem recebe, e use <b>Enviar teste agora</b>.",
+      "<b>Cadastro → Microsoft Teams</b>: no canal do Teams, abra ••• → <b>Workflows</b> → “Post to a channel when a webhook request is received”, copie o endereço gerado e cole aqui. Os alertas de paletes e o resumo das 7h passam a ir para o canal.",
+      "<b>Backup semanal</b>: o relatório semanal leva a base inteira em Excel anexada (cargas, inclusive arquivadas, paletes e ocorrências).",
+      "<b>Aba Paletes → Configurar</b>: limite, aviso e quem recebe o alerta.",
       "<b>Relatório semanal com créditos do Netlify</b>: crie um token em app.netlify.com → User settings → Applications → Personal access tokens e cadastre no Supabase como <b>NETLIFY_TOKEN</b> (Edge Functions → Secrets).",
       "<b>Regras</b>: dias úteis antes da agenda, R.F. e feriados locais.",
       "<b>Código do time</b>: troque quando alguém sair do time ou se o código vazar. Quem já tem conta continua entrando."]):""}
@@ -686,7 +988,9 @@ function vAjuda(){
       "<b>Esqueci a senha</b>: na tela de entrar, clique em <b>Esqueci minha senha</b>. O link chega no e-mail cadastrado (veja também o spam) e vale por 1 hora.",
       "<b>Trocar a senha</b>: botão <b>Senha</b> no topo, ao lado de Sair.",
       "<b>A tela não atualiza</b>: confira o “Ao vivo” no topo. Se aparecer “Conectando…”, a rede pode estar bloqueando; a página tenta de novo sozinha."]:[])
-      .concat(["<b>Tema claro ou escuro</b>: botão <b>Tema</b> no topo (Auto segue o computador)."]))}
+      .concat(["<b>Tema claro ou escuro</b>: botão <b>Tema</b> no topo (Auto segue o computador).",
+        on?"<b>Bloqueio</b>: depois de 5 senhas erradas seguidas, o acesso fica bloqueado por 15 minutos. Senhas novas precisam ter pelo menos 8 caracteres.":""]).filter(Boolean))}
+    <p><button class="btn ghost" id="vertour">Ver o tour de boas-vindas de novo</button></p>
   </article></div>`;
 }
 
@@ -698,7 +1002,8 @@ function kpis(){
   const cc={};crit.forEach(r=>{const t=r.alerta==="Fora do prazo do cronograma"?"cronograma":r.alerta==="Expedição atrasada"?"expedição":r.alerta==="Entrega atrasada"?"entrega":r.alerta.toLowerCase();cc[t]=(cc[t]||0)+1;});
   const prodRows=rows.filter(r=>r.cod>=1&&r.cod<=3), first=prodRows.find(r=>r.agenda);
   const grupo=first?prodRows.filter(r=>r.agenda===first.agenda):[];
-  return {prod,prox,exp:exp.length,expPal:exp.reduce((a,r)=>a+(r.volume||0),0),crit:crit.length,critTxt:Object.entries(cc).map(([t,n])=>n+" "+t).join(" · "),
+  const h0=hojeN(), exp7=[0,1,2,3,4,5,6].map(i=>ab.filter(r=>r.cod>=2&&r.cod<=4&&dayOf(r.exp)===h0+i).length), exp7d=[0,1,2,3,4,5,6].map(i=>wd(h0+i)+" "+br(isoOf(h0+i))+": "+exp7[i]+" a expedir");
+  return {prod,prox,n1:ab.filter(r=>r.cod===1).length,exp7,exp7d,exp:exp.length,expPal:exp.reduce((a,r)=>a+(r.volume||0),0),crit:crit.length,critTxt:Object.entries(cc).map(([t,n])=>n+" "+t).join(" · "),
     pId:first?first.id:"",pTxt:first?`<span class="mono">${esc(first.carga)}</span>${grupo.length>1?` <small>+${grupo.length-1}</small>`:""}`:"—",
     pSub:first?(first.cod===1?`R.F. ${br(first.rf)} · cronograma ${br(first.lim)}`:`${ST[first.cod].nome} · agenda ${br(first.agenda)}`):"nenhuma carga a produzir"};
 }
@@ -720,7 +1025,7 @@ function vPainel(){
       <div class="hh"><span class="label">Próxima${grupo.length>1?"s":""} carga${grupo.length>1?"s":""} para produção</span>
       <span class="d">Informar R.F. ${br(first.rf)} (${wdS(first.rf)}) · Cronograma até ${br(first.lim)} (${wdS(first.lim)}) · Expedição ${br(first.exp)} (${wdS(first.exp)}) · Agenda ${br(first.agenda)} (${wdS(first.agenda)}) · ${pl(grupo.length,"carga")}${sumVol(grupo)}</span></div>
       <div class="hbox"><table class="ht"><thead><tr><th></th><th>Carga</th><th>Envio</th><th>Galpão</th><th>Loja</th><th>Status</th><th>Informar R.F.</th><th>Cronograma até</th><th>Agenda ML</th></tr></thead><tbody>
-      ${grupo.map(r=>`<tr><td style="width:16px">${ckb(r.id)}</td><td class="big">${cgBtn(r)}</td><td class="mono">${esc(r.envio)||"—"}</td><td>${esc(r.galpao)||"—"}</td><td>${esc(r.loja)||"—"}</td><td>${ST[r.cod].nome}</td><td class="mono">${br(r.rf)}${r.cod===1?" · "+prazoTxt(r.duRf):""}</td><td class="mono">${br(r.lim)} · ${prazoTxt(r.duLim)}</td><td class="mono">${br(r.agenda)} · ${prazoTxt(r.duAg)}</td></tr>`).join("")}
+      ${grupo.map(r=>`<tr><td style="width:16px">${ckb(r.id)}</td><td class="big">${cgBtn(r)}</td><td class="mono">${esc(r.envio)||"—"}</td><td>${esc(r.galpao)||"—"}</td><td>${esc(r.loja)||"—"}</td><td>${ST[r.cod].nome}</td><td class="mono">${br(r.rf)}${r.cod===1?" · "+(r.rfInfo?'<span class="rfok">informado ✓</span>':prazoTxt(r.duRf)):""}</td><td class="mono">${br(r.lim)} · ${prazoTxt(r.duLim)}</td><td class="mono">${br(r.agenda)} · ${prazoTxt(r.duAg)}</td></tr>`).join("")}
       </tbody></table></div></div>`
     :`<div class="hero" style="--hc:var(--ok)"><div class="hh"><span class="label">Próxima carga para produção</span><span class="d">${semAgenda.length?"Nenhuma carga agendada pendente de produção.":"Nenhuma carga pendente de produção."}</span></div></div>`;
   const avisoAgenda=semAgenda.length?`<div class="hero" style="--hc:var(--high)"><div class="hh"><span class="label">Aguardando envio e agenda</span><span class="d">${pl(semAgenda.length,"carga roteirizada","cargas roteirizadas")} sem envio e data de agenda${sumVol(semAgenda)}</span></div><span class="small" style="color:var(--band-muted)">Depois de agendar no portal do Mercado Livre, marque as cargas e use <b>Agendar</b> na barra de baixo, ou abra a carga. Assim o painel calcula o cronograma e o R.F.</span></div>`:"";
@@ -730,8 +1035,8 @@ function vPainel(){
     const cards=list.slice(0,MAX).map(r=>`<div class="card ${sel.has(r.id)?"on":""}" style="${av(r)}">
         <div class="r1"><label class="ck">${ckb(r.id)}</label><span style="flex:1;min-width:0">${cgBtn(r)}</span><span class="tag ${r.nivel==="ok"?"soft":""}">${r.alerta}</span></div>
         <div class="env">${r.envio?"Envio "+esc(r.envio):"Sem envio"}${r.galpao?" · Galpão "+esc(r.galpao):""}${r.loja?" · Loja "+esc(r.loja):""}${r.volume!=null?" · "+fmtN(r.volume)+(r.volume===1?" palete":" paletes"):""}${r.obs?" · "+esc(r.obs):""}</div>
-        <div class="r2">${!r.agenda?`<span><span class="k">Sem envio e agenda · agende no portal ML e informe aqui</span></span>`:c===1?`<span><span class="k">Informar R.F.</span> <b>${br(r.rf)}</b> ${wdS(r.rf)} · ${prazoTxt(r.duRf)}</span><span><span class="k">Cronograma até</span> <b>${br(r.lim)}</b> ${wdS(r.lim)} · ${prazoTxt(r.duLim)}</span>`:""}<span>${r.agenda?`<span class="k">Agenda</span> <b>${br(r.agenda)}</b> ${wdS(r.agenda)}${c!==1?" · "+prazoTxt(r.duAg):""}`:""}</span></div>
-        ${canWrite?`<div class="r3"><button class="adv" data-adv="${esc(r.id)}" title="Registrar avanço com a data de hoje">→ ${ST[c+1].nome}</button></div>`:""}
+        <div class="r2">${!r.agenda?`<span><span class="k">Sem envio e agenda · agende no portal ML e informe aqui</span></span>`:c===1?`<span><span class="k">Informar R.F.</span> <b>${br(r.rf)}</b> ${wdS(r.rf)} · ${r.rfInfo?'<span class="rfok">informado ✓</span>':prazoTxt(r.duRf)}</span><span><span class="k">Cronograma até</span> <b>${br(r.lim)}</b> ${wdS(r.lim)} · ${prazoTxt(r.duLim)}</span>`:""}<span>${r.agenda?`<span class="k">Agenda</span> <b>${br(r.agenda)}</b> ${wdS(r.agenda)}${c!==1?" · "+prazoTxt(r.duAg):""}`:""}</span></div>
+        ${canWrite?`<div class="r3">${c===1&&r.agenda&&!r.rfInfo?`<button class="adv rfb" data-rf1="${esc(r.id)}" title="Marcar que o R.F. já foi informado">✓ R.F. informado</button>`:""}<button class="adv" data-adv="${esc(r.id)}" title="Registrar avanço com a data de hoje">→ ${ST[c+1].nome}</button></div>`:""}
       </div>`).join("");
     const sub={1:"roteirizadas, ainda fora do cronograma",2:"no cronograma, aguardando produção",3:"produzindo agora"}[c];
     return `<div class="col" style="${cv(c)}"><div class="colh"><div><div class="t">${ST[c].nome}</div><div class="sub">${sub}</div></div><span class="n">${list.length}</span></div>
@@ -743,8 +1048,12 @@ function vPainel(){
     const allSel=x.a.every(r=>sel.has(r.id)), some=x.a.some(r=>sel.has(r.id));
     const ags=[...new Set(x.a.map(r=>r.agenda).filter(Boolean))].sort();
     const pior=x.a.slice().sort((a,b)=>a.key-b.key)[0];
-    return `<div class="card envc ${allSel?"on":""}" style="${av(pior)}">
+    const vivas=x.l.filter(r=>r.cod!==0), prod=vivas.filter(r=>r.cod>=4).length, pronto=vivas.length>0&&vivas.every(r=>r.cod===4), expd=vivas.length>0&&vivas.every(r=>r.cod>=5);
+    const pct=vivas.length?Math.round(100*prod/vivas.length):0;
+    return `<div class="card envc ${allSel?"on":""} ${pronto?"pronto":""}" style="${av(pior)}">
       <div class="r1"><label class="ck"><input type="checkbox" data-selenv="${esc(x.e)}" ${allSel?"checked":""} ${some&&!allSel?'data-ind="1"':""} aria-label="Selecionar envio"><span class="mono" style="font-size:17px;font-weight:600">${esc(x.e)}</span></label><span class="k" style="font-size:12px">${pl(x.l.length,"carga")}</span></div>
+      <div class="envp"><div class="envbar"><i style="width:${pct}%"></i></div><span>${expd?"envio expedido":`${prod} de ${vivas.length} produzida${vivas.length===1?"":"s"}`}</span></div>
+      ${pronto?`<div class="envok">Envio pronto para expedir${canWrite?` <button class="adv" data-expenv="${esc(x.e)}" title="Marcar todas as cargas do envio como Expedida (hoje)">→ Expedir envio</button>`:""}</div>`:""}
       <div class="env">Agenda ${ags.map(a=>br(a)+" "+wdS(a)).join(", ")||"—"}${(()=>{const ls=[...new Set(x.l.map(r=>r.loja).filter(Boolean))];return ls.length?" · Loja "+ls.map(esc).join(", "):"";})()}${sumVol(x.l)}</div>
       <ul class="ec">${x.l.map(r=>`<li class="${aberta(r)?"":"closed"}" style="${cv(r.cod)}"><span class="dot"></span>${cgBtn(r)}<span class="k">${ST[r.cod].nome}${r.galpao?" · "+esc(r.galpao):""}</span></li>`).join("")}</ul></div>`;}).join("");
   const envCol=`<div class="col" style="--c:var(--band-muted)"><div class="colh"><div><div class="t">Por envio</div><div class="sub">envios em aberto e suas cargas</div></div><span class="n">${envios.length}</span></div>
@@ -753,36 +1062,52 @@ function vPainel(){
   const cnt={}; rows.forEach(r=>{cnt[r.cod]=(cnt[r.cod]||0)+1;});
   const flow=ORDEM.map(c=>`<button class="step" style="${cv(c)}" data-f="${c}" aria-pressed="${filtro===String(c)}"><span class="ord">${c===0?"×":"0"+c}</span><span class="n">${cnt[c]||0}</span><span class="t">${ST[c].nome}</span></button>`).join("");
   const ncrit=ab.filter(r=>r.nivel==="crit").length, nsel=allRows.filter(r=>sel.has(r.id)).length;
-  let vis=filtro==="abertas"?ab:filtro==="todas"?rows:filtro==="crit"?ab.filter(r=>r.nivel==="crit"):filtro==="sel"?rows.filter(r=>sel.has(r.id)):rows.filter(r=>String(r.cod)===filtro);
+  const pend=ab.filter(r=>pendDe(r).length);
+  let vis=filtro==="abertas"?ab:filtro==="todas"?rows:filtro==="crit"?ab.filter(r=>r.nivel==="crit"):filtro==="pend"?pend:filtro==="sel"?rows.filter(r=>sel.has(r.id)):rows.filter(r=>String(r.cod)===filtro);
   lastVis=vis;
-  const fixos=["abertas","todas","crit","sel"];
-  const chips=[["abertas","Em aberto ("+ab.length+")"],["crit","Críticas ("+ncrit+")"],["todas","Todas ("+rows.length+")"],["sel","Selecionadas ("+nsel+")"]].map(([k,t])=>`<button class="chip" data-f="${k}" aria-pressed="${filtro===k}">${t}</button>`).join("")
+  const fixos=["abertas","todas","crit","pend","sel"];
+  const chips=[["abertas","Em aberto ("+ab.length+")"],["crit","Críticas ("+ncrit+")"],["pend","Pendências de cadastro ("+pend.length+")"],["todas","Todas ("+rows.length+")"],["sel","Selecionadas ("+nsel+")"]].map(([k,t])=>`<button class="chip" data-f="${k}" aria-pressed="${filtro===k}">${t}</button>`).join("")
     +(fixos.includes(filtro)?"":`<button class="chip" data-f="${filtro}" aria-pressed="true">${ST[filtro].nome} ✕</button>`);
   const visAll=vis.length&&vis.every(r=>sel.has(r.id)), visSome=vis.some(r=>sel.has(r.id));
   const trow=r=>`<tr class="${aberta(r)?"":"closed"} ${r.nivel==="crit"?"crit":""} ${sel.has(r.id)?"on":""}" style="${cv(r.cod)};${av(r)}">
       <td class="w">${ckb(r.id)}</td><td class="mono">${r.envio?esc(r.envio):'<span class="small">sem envio</span>'}</td><td class="mono">${cgBtn(r)}</td><td>${esc(r.galpao)||"—"}</td><td class="mono">${esc(r.loja)||"—"}</td>
       <td><span class="pill">${ST[r.cod].nome}</span></td><td class="mono">${br(r.rot)}</td>
-      <td class="mono">${br(r.rf)}${r.cod===1?`<div class="small">${prazoTxt(r.duRf)}</div>`:""}</td>
+      <td class="mono">${br(r.rf)}${r.cod===1?`<div class="small">${r.rfInfo?'<span class="rfok">informado ✓</span>':prazoTxt(r.duRf)}</div>`:""}</td>
       <td class="mono">${br(r.lim)}${r.cod===1?`<div class="small">${prazoTxt(r.duLim)}</div>`:""}</td>
       <td class="mono">${br(r.agenda)}<div class="small">${aberta(r)?prazoTxt(r.duAg):""}</div></td>
       <td class="num mono">${r.volume!=null?fmtN(r.volume):"—"}</td>
-      <td>${esc(r.acao)||"—"}</td><td><span class="alert">${r.alerta}</span></td><td class="small">${esc(r.obs)}</td></tr>`;
+      <td>${esc(r.acao)||"—"}${canWrite&&r.cod>=1&&r.cod<=5?`<div class="tacts">${r.cod===1&&r.agenda&&!r.rfInfo?`<button class="adv sm" data-rf1="${esc(r.id)}" title="Marcar R.F. informado">✓ R.F.</button>`:""}<button class="adv sm" data-adv="${esc(r.id)}" title="Avançar para ${ST[r.cod+1].nome} (hoje)">→ ${ST[r.cod+1].nome}</button></div>`:""}</td><td><span class="alert">${r.alerta}</span>${filtro==="pend"?`<div class="small pendtx">${pendDe(r).join(" · ")}</div>`:""}</td><td class="small">${esc(r.obs)}</td></tr>`;
   return `<section class="prod" aria-label="Cargas para produção"><div class="in">
       <div class="prodhead"><h2>Cargas para produção${galpaoF?" · "+(galpaoF==="__sem"?"sem galpão":"Galpão "+esc(galpaoF)):""}</h2>
-      <div class="rule"><span>Regra: entrar no cronograma até</span>${canAdmin?`<span class="rg" role="group" aria-label="Dias úteis antes da agenda"><button data-regra="-1" aria-label="Diminuir um dia" ${cfg.regraDias<=1||salvandoRegra?"disabled":""}>−</button><output aria-live="polite">${cfg.regraDias}</output><button data-regra="1" aria-label="Aumentar um dia" ${cfg.regraDias>=20||salvandoRegra?"disabled":""}>+</button></span><b>${cfg.regraDias===1?"dia útil":"dias úteis"} antes da agenda</b>`:`<b>${pl(cfg.regraDias,"dia útil","dias úteis")} antes da agenda</b>`}<span>· Informar R.F.</span>${canAdmin?`<span class="rg" role="group" aria-label="Dias úteis antes do cronograma para informar R.F."><button data-rf="-1" aria-label="Diminuir um dia" ${cfg.rfDias<=0||salvandoRegra?"disabled":""}>−</button><output aria-live="polite">${cfg.rfDias}</output><button data-rf="1" aria-label="Aumentar um dia" ${cfg.rfDias>=10||salvandoRegra?"disabled":""}>+</button></span><b>${cfg.rfDias===1?"dia útil":"dias úteis"} antes do cronograma</b>`:`<b>${pl(cfg.rfDias,"dia útil","dias úteis")} antes do cronograma</b>`}<span>· d.u. = dias úteis${canWrite?" · clique no número da carga para mudar o status":""}</span></div></div>
+      <div class="rule"><span>Regra: entrar no cronograma até</span>${canAdmin?`<span class="rg" role="group" aria-label="Dias úteis antes da agenda"><button data-regra="-1" aria-label="Diminuir um dia" ${cfg.regraDias<=1||salvandoRegra?"disabled":""}>−</button><output aria-live="polite">${cfg.regraDias}</output><button data-regra="1" aria-label="Aumentar um dia" ${cfg.regraDias>=20||salvandoRegra?"disabled":""}>+</button></span><b>${cfg.regraDias===1?"dia útil":"dias úteis"} antes da agenda</b>`:`<b>${pl(cfg.regraDias,"dia útil","dias úteis")} antes da agenda</b>`}<span>· Informar R.F.</span>${canAdmin?`<span class="rg" role="group" aria-label="Dias úteis antes do cronograma para informar R.F."><button data-rf="-1" aria-label="Diminuir um dia" ${cfg.rfDias<=0||salvandoRegra?"disabled":""}>−</button><output aria-live="polite">${cfg.rfDias}</output><button data-rf="1" aria-label="Aumentar um dia" ${cfg.rfDias>=10||salvandoRegra?"disabled":""}>+</button></span><b>${cfg.rfDias===1?"dia útil":"dias úteis"} antes do cronograma</b>`:`<b>${pl(cfg.rfDias,"dia útil","dias úteis")} antes do cronograma</b>`}${cfg.regraTerca?`<span class="tercatag" title="Agenda na terça: R.F. na sexta anterior e cronograma até o sábado">· Agenda de terça: R.F. na sexta</span>`:""}<span>· d.u. = dias úteis${canWrite?" · clique no número da carga para mudar o status":""}</span></div></div>
       ${hero}${avisoAgenda}<div class="cols">${prodCols}${envCol}</div></div></section>
     <div class="in main">
-      <section aria-label="Status das cargas"><div class="label" style="margin-bottom:8px">Todas as cargas por status · clique para filtrar a tabela</div><div class="flow">${flow}</div></section>
+      <section aria-label="Fluxo das cargas"><div class="pipehead"><h2>Fluxo das cargas</h2><span class="small">clique numa etapa para filtrar a fila</span></div>
+        <div class="pipe">${[1,2,3,4,5,6].map((c,i)=>`<button class="pn ${cnt[c]?"":"zero"}" style="${cv(c)}" data-f="${c}" aria-pressed="${filtro===String(c)}" aria-label="${ST[c].nome}: ${cnt[c]||0}"><span class="ring"><b>${cnt[c]||0}</b></span><span class="pl">${ST[c].nome}</span></button>${i<5?`<span class="pt ${cnt[c]?"":"parado"}" style="--a:var(${ST[c].c});--b:var(${ST[c+1].c})" aria-hidden="true"><i></i><i></i><i></i></span>`:""}`).join("")}</div>
+        ${cnt[0]?`<div class="pipex"><button class="chip" data-f="0" aria-pressed="${filtro==="0"}">${ST[0].nome}: ${cnt[0]}</button></div>`:""}</section>
+      ${pend.length?(()=>{const c={};pend.forEach(r=>pendDe(r).forEach(t=>{c[t]=(c[t]||0)+1;}));
+        return `<section class="pendbox" aria-label="Pendências de cadastro"><div><span class="label">Pendências de cadastro</span><div class="pendl">${Object.entries(c).map(([t,n])=>`<span class="ctag mini">${n} ${esc(t)}</span>`).join("")}</div></div><button class="btn ghost sm" data-f="pend" ${filtro==="pend"?'aria-pressed="true"':""}>Ver as ${pl(pend.length,"carga")}</button></section>`;})():""}
       <section style="display:grid;gap:10px">
         <div class="bar fila"><div class="label">Fila de acompanhamento · críticas primeiro</div><div class="chips">${chips}</div></div>
         <div class="tablebox"><table class="t"><thead><tr><th class="w"><input type="checkbox" id="selall" ${visAll?"checked":""} ${visSome&&!visAll?'data-ind="1"':""} aria-label="Selecionar todas desta visão"></th><th>Envio</th><th>Carga</th><th>Galpão</th><th>Loja</th><th>Status</th><th>Roteirização</th><th>Informar R.F.</th><th>Cronograma até</th><th>Agenda ML</th><th class="num">Paletes</th><th>Ação</th><th>Alerta</th><th>Obs.</th></tr></thead>
         <tbody>${vis.length?vis.map(trow).join(""):`<tr><td colspan="14" class="empty">Nenhuma carga nesta visão.</td></tr>`}</tbody></table></div>
       </section>
-      <footer><div>"Cronograma até" é calculado: agenda menos ${pl(cfg.regraDias,"dia útil","dias úteis")}. "Informar R.F." é ${pl(cfg.rfDias,"dia útil","dias úteis")} antes do cronograma. A expedição é na véspera da agenda, porque a entrega é na madrugada do dia agendado. Dias úteis sem sábados, domingos e feriados${cfg.feriadosExtras.length?" (nacionais + "+cfg.feriadosExtras.length+" cadastrados)":" nacionais"}.</div>
+      <footer><div>"Cronograma até" é calculado: agenda menos ${pl(cfg.regraDias,"dia útil","dias úteis")}. "Informar R.F." é ${pl(cfg.rfDias,"dia útil","dias úteis")} antes do cronograma.${cfg.regraTerca?" Agenda na terça: R.F. na sexta anterior e cronograma até o sábado.":""} A expedição é na véspera da agenda, porque a entrega é na madrugada do dia agendado. Dias úteis sem sábados, domingos e feriados${cfg.feriadosExtras.length?" (nacionais + "+cfg.feriadosExtras.length+" cadastrados)":" nacionais"}.</div>
       <div>${modoLocal?"Os dados ficam guardados neste navegador. Mudou status por aqui? Clique em Baixar base e salve a planilha na pasta da equipe: ela leva o histórico e as regras, e quem carregar essa planilha vê tudo igual.":"As mudanças de status feitas aqui ficam salvas para toda a equipe e entram no histórico de cada carga."} Marque cargas para exportar ou mudar o status de várias de uma vez.</div></footer>
     </div>`;
 }
 const fmtN=(n)=>Number(n).toLocaleString("pt-BR",{maximumFractionDigits:2});
+/* o que falta preencher numa carga em aberto */
+function pendDe(r){
+  if(!aberta(r)) return [];
+  const p=[];
+  if(!r.envio||!r.agenda) p.push("sem envio ou agenda");
+  if(!r.galpao) p.push("sem galpão");
+  if(!r.loja) p.push("sem loja");
+  if(r.volume==null) p.push("sem paletes");
+  if((!online||online.master)&&r.agenda&&r.agenda>=CORTE_PAL()&&r.pbr==null&&r.chep==null) p.push("sem PBR e CHEP");
+  return p;
+}
 function sumVol(list){const v=list.filter(r=>r.volume!=null);if(!v.length)return "";const t=v.reduce((s,r)=>s+r.volume,0);return " · "+fmtN(t)+(t===1?" palete":" paletes");}
 
 /* ---------- aba Calendário ---------- */
@@ -900,7 +1225,7 @@ function vIndicadores(){
   const nCr=k.crOk+k.crLate+k.crPend, nEn=k.enOk+k.enLate+k.enPend;
   const pCr=pct(k.crOk,nCr), pEn=pct(k.enOk,nEn);
   const mc=(p)=>p==null?"--line":p>=90?"--ok":p>=75?"--warn":"--crit";
-  const tile=(t,v,d,p)=>`<div class="kpi"><span class="label">${t}</span><span class="v">${v}</span>${p!==undefined?`<div class="meter" style="--mc:var(${mc(p)})"><i style="width:${p==null?0:p}%"></i></div>`:""}<span class="d">${d}</span></div>`;
+  const tile=(t,v,d,p)=>`<div class="kpi tile"><span class="label">${t}</span><span class="v">${v}</span>${p!==undefined?`<div class="meter" style="--mc:var(${mc(p)})"><i style="width:${p==null?0:p}%"></i></div>`:""}<span class="d">${d}</span></div>`;
   const nomeMes=(s)=>{const [y,m]=s.split("-");return ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"][+m-1]+"/"+y;};
   const gs=galpoesInfo().map(([g])=>g).filter(g=>!galpaoF||g===galpaoF);
   const porG=gs.map(g=>{const l=base.filter(r=>(r.galpao||"__sem")===g);const x=kpiCalc(l);const n1=x.crOk+x.crLate+x.crPend,n2=x.enOk+x.enLate+x.enPend;return {g,x,p1:pct(x.crOk,n1),n1,p2:pct(x.enOk,n2),n2,ab:l.filter(aberta).length,vol:l.filter(aberta).reduce((s,r)=>s+(r.volume||0),0),temVol:l.some(r=>r.volume!=null)};});
@@ -937,13 +1262,14 @@ function vIndicadores(){
 /* ================= gaveta da carga ================= */
 function abrir(id){ const d=docs.get(id); if(!d) return; openId=id; dConfirmDel=false; dMsg="";
   const r=allRows.find(x=>x.id===id)||calc(id,d,hojeN());
-  dForm={status:String(r.cod),em:hojeIso(),obs:r.obs,envio:r.envio,agenda:r.agenda,galpao:r.galpao,loja:r.loja,volume:r.volume==null?"":String(r.volume),rot:r.rot};
+  dForm={status:String(r.cod),em:hojeIso(),obs:r.obs,envio:r.envio,agenda:r.agenda,galpao:r.galpao,loja:r.loja,volume:r.volume==null?"":String(r.volume),pbr:r.pbr==null?"":String(r.pbr),chep:r.chep==null?"":String(r.chep),rot:r.rot};
   renderDrawer(); pedirNomes(r.hist.map(h=>h.por).filter(Boolean)); }
 function fechar(){openId=null;dForm=null;$("#drawer").innerHTML="";}
 function histTxt(h){
   if(h.tipo==="status") return h.de==null?`Entrou no painel como <b>${ST[h.para]?ST[h.para].nome:"?"}</b>`:`Status: ${ST[h.de]?ST[h.de].nome:"?"} → <b>${ST[h.para]?ST[h.para].nome:"?"}</b>`;
-  const nm={agenda:"Agenda",galpao:"Galpão",loja:"Loja destino",envio:"Envio",rot:"Roteirização",volume:"Paletes"}[h.tipo]||h.tipo;
-  const f=(v)=>h.tipo==="agenda"||h.tipo==="rot"?brA(v):(v===""||v==null?"—":h.tipo==="volume"?fmtN(v):esc(v));
+  if(h.tipo==="rf") return h.para?`<b>R.F. informado</b> ✓`:`R.F. informado foi <b>desmarcado</b>`;
+  const nm={agenda:"Agenda",galpao:"Galpão",loja:"Loja destino",envio:"Envio",rot:"Roteirização",volume:"Paletes",pbr:"Paletes PBR",chep:"Paletes CHEP"}[h.tipo]||h.tipo;
+  const f=(v)=>h.tipo==="agenda"||h.tipo==="rot"?brA(v):(v===""||v==null?"—":["volume","pbr","chep"].includes(h.tipo)?fmtN(v):esc(v));
   return `${nm}: ${f(h.de)} → <b>${f(h.para)}</b>`;
 }
 function renderDrawerInfo(){
@@ -962,12 +1288,14 @@ function renderDrawerInfo(){
       <div><span class="label">Expedição (véspera da agenda)</span><span class="v mono">${r.exp?brA(r.exp)+" "+wdS(r.exp):"—"}</span></div>
       <div><span class="label">Agenda ML</span><span class="v mono">${brA(r.agenda)} ${wdS(r.agenda)}${aberta(r)?" · "+prazoTxt(r.duAg):""}</span></div>
       <div><span class="label">Roteirização</span><span class="v mono">${brA(r.rot)}</span></div>
-      <div><span class="label">Paletes</span><span class="v mono">${r.volume!=null?fmtN(r.volume):"—"}</span></div>
+      <div><span class="label">Paletes</span><span class="v mono">${r.volume!=null?fmtN(r.volume):"—"}${r.pbr!=null||r.chep!=null?` <span class="small">· PBR ${r.pbr??"—"} · CHEP ${r.chep??"—"}</span>`:""}</span></div>
+      ${r.cod===1&&r.agenda?`<div style="grid-column:1/-1" class="rfbox ${r.rfInfo?"ok":""}"><span class="label">R.F.${r.terca?" · agenda de terça: R.F. na sexta":""}</span><span class="v">${r.rfInfo?`Informado ✓ em ${dtHora(r.rfInfo.em)}${nomeDe(r.rfInfo.por)||r.rfInfo.porNome?" por "+esc(nomeDe(r.rfInfo.por)||r.rfInfo.porNome):""}`:`Ainda não informado · ${brA(r.rf)} ${wdS(r.rf)}`}</span>${canWrite?`<button class="btn ${r.rfInfo?"ghost":""} sm" data-rf1="${esc(r.id)}">${r.rfInfo?"Desmarcar":"Marcar R.F. informado"}</button>`:""}</div>`:""}
       ${r.acao?`<div style="grid-column:1/-1"><span class="label">Próxima ação</span><span class="v">${esc(r.acao)}</span></div>`:""}
     </div>
     ${online&&window.PAINEL_EXT?(()=>{const l=PAINEL_EXT.ocDaCarga(r.carga), ab=l.filter(o=>o.status==="aberta");
       return `<section class="docs"><div class="dochd"><span class="label">Ocorrências${l.length?` · ${ab.length} aberta${ab.length===1?"":"s"} de ${l.length}`:""}</span>${canWrite?`<button class="btn ghost sm" data-novaoc="${esc(r.id)}">Registrar ocorrência</button>`:""}</div>
         ${l.length?`<ul class="docl">${l.slice(0,5).map(o=>`<li class="${o.status}"><b>${esc(o.tipo)}</b> · ${brA(o.dia)} · ${o.status==="aberta"?"aberta":"resolvida"}${o.descricao?`<div class="small">${esc(o.descricao)}</div>`:""}</li>`).join("")}</ul><a class="small" href="#ocorrencias" data-close="1">Ver todas em Ocorrências</a>`:`<p class="small" style="margin:0">Nenhuma ocorrência para esta carga.</p>`}</section>`;})():""}
+    <section class="docs"><div class="dochd"><span class="label">Mensagens prontas</span><button class="btn ghost sm" data-msg="${esc(r.id)}">Abrir mensagens</button></div><p class="small" style="margin:0">Textos para WhatsApp ou Teams com o envio ${r.envio?esc(r.envio):""} e as cargas dele: informar R.F., avisar expedição e reagendamento.</p></section>
     <section style="display:grid;gap:8px"><span class="label">Histórico</span>
       ${hist.length?`<ul class="tl">${hist.map(h=>`<li style="${h.tipo==="status"&&ST[h.para]?cv(h.para):"--c:var(--muted)"}"><span class="b"></span><div><div class="tx">${histTxt(h)}</div><div class="sm">${h.tipo==="status"&&h.em?"em "+brA(h.em)+" · ":""}${h.origem==="base"?"pela planilha":h.origem==="wms"?"pelo WMS":h.origem==="inicial"?"situação inicial":"no painel"}${(nomeDe(h.por)||h.porNome)?" · "+esc(nomeDe(h.por)||h.porNome):""}${h.reg?" · registrado "+dtHora(h.reg):""}</div></div></li>`).join("")}</ul>`:`<p class="small" style="margin:0">Sem histórico.</p>`}
     </section>`;
@@ -989,6 +1317,8 @@ function renderDrawer(){
         <label>Loja destino<input type="text" id="dlj" value="${esc(f.loja)}" list="llist"><datalist id="llist">${[...new Set(allRows.map(x=>x.loja).filter(Boolean).concat(cadx?cadx.lojas.map(l=>String(l.codigo)):[]))].map(l=>`<option value="${esc(l)}">`).join("")}</datalist></label>
         <label>Roteirização<input type="date" id="dro" value="${esc(f.rot)}"></label>
         <label>Paletes<input type="number" id="dvo" value="${esc(f.volume)}" min="0" step="any"></label>
+        <label>Paletes PBR<input type="number" id="dpb" value="${esc(f.pbr)}" min="0" step="1" placeholder="retornável"></label>
+        <label>Paletes CHEP<input type="number" id="dch" value="${esc(f.chep)}" min="0" step="1" placeholder="não retorna"></label>
       </div>
       <label style="display:grid;gap:4px;font-size:13px;font-weight:600">Observação<textarea id="dob">${esc(f.obs)}</textarea></label>
       <div class="actions"><button class="btn" id="dsave" ${dSaving?"disabled":""}>${dSaving?"Salvando…":"Salvar"}</button><button class="btn ghost" id="dclose2">Fechar</button><span class="toast ${dMsg.startsWith("!")?"err":""}" id="dmsg">${esc(dMsg.replace(/^!/,""))}</span></div>
@@ -1010,8 +1340,8 @@ async function salvarCarga(){
     entradas.push({tipo:"status",de:atual,para:novo,em:f.em,reg:now,por,origem:"painel"}); patch.status=novo; }
   const cmp=[["envio","envio"],["agenda","agenda"],["galpao","galpao"],["loja","loja"],["rot","rot"]];
   cmp.forEach(([k])=>{const nv=String(f[k]||"").trim(), ov=String(d[k]||"");if(nv!==ov){entradas.push({tipo:k,de:ov,para:nv,em:hojeIso(),reg:now,por,origem:"painel"});patch[k]=nv;}});
-  const vol=f.volume===""?null:Number(f.volume); const ov=typeof d.volume==="number"?d.volume:null;
-  if(!(vol===ov||(vol!=null&&isNaN(vol)))){entradas.push({tipo:"volume",de:ov==null?"":ov,para:vol==null?"":vol,em:hojeIso(),reg:now,por,origem:"painel"});patch.volume=vol;}
+  [["volume","volume"],["pbr","pbr"],["chep","chep"]].forEach(([k])=>{const vol=f[k]===""||f[k]==null?null:Number(f[k]); const ov=typeof d[k]==="number"?d[k]:null;
+    if(!(vol===ov||(vol!=null&&(isNaN(vol)||vol<0)))){entradas.push({tipo:k,de:ov==null?"":ov,para:vol==null?"":vol,em:hojeIso(),reg:now,por,origem:"painel"});patch[k]=vol;}});
   if(String(f.obs||"")!==String(d.obs||"")) patch.obs=String(f.obs||"");
   if(!Object.keys(patch).length){dMsg="Nada mudou.";renderDrawer();return;}
   patch.hist=(Array.isArray(d.hist)?d.hist:[]).concat(entradas); patch.atualizadoEm=now; patch.atualizadoPor=por;
@@ -1028,6 +1358,16 @@ async function avancar(id){
     marcarSujo(true); setToast(`Carga ${r?r.carga:""} → ${ST[novo].nome} (hoje). Para outra data, abra a carga.`); }
   catch(e){ setToast(erroTxt(e),true); }
 }
+async function marcarRF(ids,valor){
+  const now=new Date().toISOString(); let ok=0, err=null;
+  const alvo=ids.filter(id=>{const d=docs.get(id);return d&&(typeof d.status==="number"?d.status:1)===1&&!!(d.rfInfo&&d.rfInfo.em)!==valor;});
+  if(!alvo.length){setToast(valor?"Nenhuma carga selecionada está aguardando R.F.":"Nada para desmarcar.");return;}
+  await emLotes(alvo,4,async(id)=>{const d=docs.get(id);
+    try{await db.collection("cargas").doc(id).update({rfInfo:valor?{em:now,por:meId||null,porNome:online?online.nome:""}:null,hist:(d.hist||[]).concat([{tipo:"rf",de:!valor,para:valor,em:hojeIso(),reg:now,por:meId||null,origem:"painel"}]),atualizadoEm:now,atualizadoPor:meId||null});ok++;}catch(e){err=e;}});
+  if(ok) marcarSujo(true);
+  setToast(err?`${ok} de ${alvo.length} marcadas. ${erroTxt(err)}`:valor?`R.F. informado ✓ em ${pl(ok,"carga")}. O alerta saiu.`:`R.F. desmarcado em ${pl(ok,"carga")}.`,!!err);
+  if(openId) renderDrawer();
+}
 async function excluir(){ const id=openId; try{ await db.collection("cargas").doc(id).delete(); marcarSujo(true); sel.delete(id); fechar(); setToast("Carga excluída."); }catch(e){ dMsg="!"+erroTxt(e); renderDrawer(); } }
 function erroTxt(e){const c=e&&e.code; if(c==="invalid_argument") {canWrite=false;readOnlyReason="Seu acesso não permite alterar os dados.";return online?"Seu acesso não permite esta alteração. Peça ao Administrador Master para liberar.":"Seu acesso não permite alterar os dados deste painel. Peça acesso de Colaborador ao dono do painel.";}
   if(c==="quota_exceeded") return "O painel atingiu o limite de armazenamento. Exclua cargas antigas para continuar.";
@@ -1043,7 +1383,7 @@ function renderXbar(){
   $("#xbar").innerHTML=`<div class="xbar"><div class="in">
     <span><b>${n}</b> ${n>1?"cargas selecionadas":"carga selecionada"} em ${pl(new Set(list.map(r=>r.envio)).size,"envio")}${sumVol(list)}</span>
     <span class="actions">${canWrite?`<label class="actions" style="gap:6px;font-size:13px">Mudar para <select id="bst">${ORDEM.map(c=>`<option value="${c}" ${String(c)===bulkSt?"selected":""}>${ST[c].nome}</option>`).join("")}</select> em <input type="date" id="bdt" value="${esc(bulkData||hojeIso())}" max="${hojeIso()}"></label><button class="btn ghost" id="bapl" ${bulkBusy?"disabled":""}>${bulkBusy?"Aplicando…":"Aplicar"}</button>`:""}
-    <button class="btn ghost" id="limpar">Limpar</button><button class="btn" id="exportar">Exportar para Excel</button></span>
+    <button class="btn ghost" id="limpar">Limpar</button>${canWrite&&list.some(r=>r.cod===1&&r.agenda&&!r.rfInfo)?`<button class="btn ghost" id="brf">✓ R.F. informado</button>`:""}<button class="btn ghost" id="bmsg">Mensagem</button><button class="btn" id="exportar">Exportar para Excel</button></span>
     ${canWrite?`<span class="actions" style="flex-basis:100%;justify-content:flex-end"><label class="actions" style="gap:6px;font-size:13px">Agendar: envio <input type="text" id="ben" inputmode="numeric" placeholder="nº do envio" value="${esc(bulkEnvio)}" style="width:120px"> agenda <input type="date" id="bag" value="${esc(bulkAgenda)}"></label><button class="btn ghost" id="bagd" ${bulkBusy?"disabled":""}>Agendar ${n>1?"as "+n:"a carga"}</button></span>`:""}</div></div>`;
 }
 async function aplicarAgenda(){
@@ -1087,11 +1427,11 @@ const D12=(s)=>{if(!s)return "";const [y,m,d]=s.split("-").map(Number);return ne
 const serial=(s)=>{const n=dayOf(s);return n==null?null:n+25569;}; // data → número de série do Excel
 function planilhaBase(list,comHist){
   const H=4; // linha do cabeçalho
-  const aoa=[["BASE DE CARGAS — Painel de Cargas","","","","","","","","","DIAS ÚTEIS ANTES DA AGENDA (altere aqui)","DIAS ÚTEIS ANTES DO CRONOGRAMA P/ INFORMAR R.F. (altere aqui)"],
-    ["Uma linha por carga (repita o envio quando tiver mais de uma carga). PALETES vem do WMS. As datas de cronograma e de informar R.F. são calculadas pelas regras das células J2 e K2. Não mude os nomes do cabeçalho.","","","","","","","","",cfg.regraDias,cfg.rfDias],
+  const aoa=[["BASE DE CARGAS — Painel de Cargas","","","","","","","","","","","DIAS ÚTEIS ANTES DA AGENDA (altere aqui)","DIAS ÚTEIS ANTES DO CRONOGRAMA P/ INFORMAR R.F. (altere aqui)","REGRA DA TERÇA: R.F. NA SEXTA (1 = sim, 0 = não)"],
+    ["Uma linha por carga (repita o envio quando tiver mais de uma carga). PALETES vem do WMS; PBR e CHEP você preenche (só o PBR volta). As datas de cronograma e de informar R.F. são calculadas pelas regras das células L2, M2 e N2. Não mude os nomes do cabeçalho.","","","","","","","","","","",cfg.regraDias,cfg.rfDias,cfg.regraTerca?1:0],
     [],
-    ["#ENVIO","CARGA","GALPÃO","LOJA DESTINO","DATA ROTEIRIZAÇÃO","DATA AGENDA","STATUS","PALETES","OBSERVAÇÃO","DATA CRONOGRAMA (calculada)","DATA INFORMAR R.F. (calculada)","ALERTA (na exportação)","AÇÃO (na exportação)"]]
-    .concat(list.map(r=>[num(r.envio),num(r.carga),r.galpao,num(r.loja),D12(r.rot),D12(r.agenda),ST[r.cod].plan,r.volume==null?"":r.volume,r.obs,"","",r.alerta,r.acao]));
+    ["#ENVIO","CARGA","GALPÃO","LOJA DESTINO","DATA ROTEIRIZAÇÃO","DATA AGENDA","STATUS","PALETES","PALETES PBR","PALETES CHEP","OBSERVAÇÃO","DATA CRONOGRAMA (calculada)","DATA INFORMAR R.F. (calculada)","R.F. INFORMADO","ALERTA (na exportação)","AÇÃO (na exportação)"]]
+    .concat(list.map(r=>[num(r.envio),num(r.carga),r.galpao,num(r.loja),D12(r.rot),D12(r.agenda),ST[r.cod].plan,r.volume==null?"":r.volume,r.pbr==null?"":r.pbr,r.chep==null?"":r.chep,r.obs,"","",r.rfInfo?new Date(r.rfInfo.em):"",r.alerta,r.acao]));
   const ws=XLSX.utils.aoa_to_sheet(aoa,{cellDates:true,dateNF:"dd/mm/yyyy"});
   const anos=[...new Set([hojeN(),...list.map(r=>dayOf(r.agenda)).filter(x=>x!=null)].map(n=>new Date(n*864e5).getUTCFullYear()))];
   const y0=Math.min(...anos), y1=Math.max(...anos)+1;
@@ -1099,20 +1439,22 @@ function planilhaBase(list,comHist){
   (cfg.feriadosExtras||[]).forEach(d=>fer.push([d,"Feriado extra (cadastrado no painel)"])); fer.sort((a,b)=>a[0].localeCompare(b[0]));
   const ferRef=`FERIADOS!$A$2:$A$${Math.max(fer.length+1,2)+40}`;
   list.forEach((r,i)=>{const row=H+1+i; const v=serial(r.lim), w=serial(r.rf);
-    ws["J"+row]={t:v==null?"s":"n",v:v==null?"":v,f:`IF(F${row}="","",WORKDAY(F${row},-$J$2,${ferRef}))`,z:"dd/mm/yyyy"};
-    ws["K"+row]={t:w==null?"s":"n",v:w==null?"":w,f:`IF(J${row}="","",WORKDAY(J${row},-$K$2,${ferRef}))`,z:"dd/mm/yyyy"};});
-  ws["J2"]={t:"n",v:cfg.regraDias}; ws["K2"]={t:"n",v:cfg.rfDias};
-  ws["!merges"]=[{s:{r:1,c:0},e:{r:1,c:8}}];
-  ws["!cols"]=[12,12,10,12,18,14,24,9,30,22,24,22,24].map(w=>({wch:w})); ws["!autofilter"]={ref:`A${H}:M${H+list.length}`};
+    const ter=`AND($N$2=1,WEEKDAY(F${row},2)=2)`;
+    ws["L"+row]={t:v==null?"s":"n",v:v==null?"":v,f:`IF(F${row}="","",IF(${ter},F${row}-3,WORKDAY(F${row},-$L$2,${ferRef})))`,z:"dd/mm/yyyy"};
+    ws["M"+row]={t:w==null?"s":"n",v:w==null?"":w,f:`IF(L${row}="","",IF(${ter},WORKDAY(F${row}-3,-1,${ferRef}),WORKDAY(L${row},-$M$2,${ferRef})))`,z:"dd/mm/yyyy"};
+    if(r.rfInfo&&ws["N"+row]) ws["N"+row].z="dd/mm/yyyy hh:mm";});
+  ws["L2"]={t:"n",v:cfg.regraDias}; ws["M2"]={t:"n",v:cfg.rfDias}; ws["N2"]={t:"n",v:cfg.regraTerca?1:0};
+  ws["!merges"]=[{s:{r:1,c:0},e:{r:1,c:10}}];
+  ws["!cols"]=[12,12,10,12,18,14,24,9,11,12,30,22,24,18,22,24].map(w=>({wch:w})); ws["!autofilter"]={ref:`A${H}:P${H+list.length}`};
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"BASE");
   const fs=XLSX.utils.aoa_to_sheet([["FERIADO","DESCRIÇÃO"]].concat(fer.map(([d,n])=>[D12(d),n])),{cellDates:true,dateNF:"dd/mm/yyyy"});
   fs["!cols"]=[{wch:14},{wch:36}]; XLSX.utils.book_append_sheet(wb,fs,"FERIADOS");
   if(comHist){
     const h=[["#ENVIO","CARGA","REGISTRADO EM","O QUE MUDOU","DE","PARA","DATA DO FATO","ORIGEM","QUEM"]];
-    list.forEach(r=>r.hist.forEach(x=>{const st=x.tipo==="status";h.push([num(r.envio),num(r.carga),x.reg?new Date(x.reg):"",st?"STATUS":x.tipo.toUpperCase(),st?(x.de==null?"":ST[x.de]?ST[x.de].plan:""):String(x.de??""),st?(ST[x.para]?ST[x.para].plan:""):String(x.para??""),st?D12(x.em):"",x.origem==="base"?"planilha":x.origem==="wms"?"WMS":x.origem==="inicial"?"situação inicial":"painel",nomeDe(x.por)||x.porNome||""]);}));
+    list.forEach(r=>r.hist.forEach(x=>{const st=x.tipo==="status"; if(x.tipo==="rf"){h.push([num(r.envio),num(r.carga),x.reg?new Date(x.reg):"","RF",String(!!x.de),String(!!x.para),"",x.origem==="base"?"planilha":"painel",nomeDe(x.por)||x.porNome||""]);return;}h.push([num(r.envio),num(r.carga),x.reg?new Date(x.reg):"",st?"STATUS":x.tipo.toUpperCase(),st?(x.de==null?"":ST[x.de]?ST[x.de].plan:""):String(x.de??""),st?(ST[x.para]?ST[x.para].plan:""):String(x.para??""),st?D12(x.em):"",x.origem==="base"?"planilha":x.origem==="wms"?"WMS":x.origem==="inicial"?"situação inicial":"painel",nomeDe(x.por)||x.porNome||""]);}));
     const hs=XLSX.utils.aoa_to_sheet(h,{cellDates:true,dateNF:"dd/mm/yyyy"}); hs["!cols"]=[12,12,18,14,24,24,14,16,24].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb,hs,"HISTÓRICO");
-    const rg=[["REGRA","VALOR"],["DIAS ÚTEIS ANTES DA AGENDA",cfg.regraDias],["DIAS ÚTEIS P/ INFORMAR R.F. (ANTES DO CRONOGRAMA)",cfg.rfDias],["ALERTA ATENÇÃO (DIAS ÚTEIS)",cfg.atencaoDias]].concat((cfg.feriadosExtras||[]).map(f=>["FERIADO EXTRA",D12(f)]));
+    const rg=[["REGRA","VALOR"],["DIAS ÚTEIS ANTES DA AGENDA",cfg.regraDias],["DIAS ÚTEIS P/ INFORMAR R.F. (ANTES DO CRONOGRAMA)",cfg.rfDias],["ALERTA ATENÇÃO (DIAS ÚTEIS)",cfg.atencaoDias],["REGRA DA TERÇA: R.F. NA SEXTA (1 = SIM, 0 = NÃO)",cfg.regraTerca?1:0]].concat((cfg.feriadosExtras||[]).map(f=>["FERIADO EXTRA",D12(f)]));
     const rs=XLSX.utils.aoa_to_sheet(rg,{cellDates:true,dateNF:"dd/mm/yyyy"}); rs["!cols"]=[{wch:30},{wch:14}];
     XLSX.utils.book_append_sheet(wb,rs,"REGRAS");
   }
@@ -1127,8 +1469,8 @@ async function salvarXlsx(wb,nome){
   else { try{XLSX.writeFile(wb,nome);setToast("Arquivo salvo: "+nome+(modoLocal?". Guarde na pasta da equipe.":""));return true;}catch(e){setToast("Não foi possível exportar nesta tela.",true);return false;} }
 }
 const stamp=()=>{const d=new Date();return String(d.getDate()).padStart(2,"0")+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+d.getFullYear();};
-async function exportarSel(){const list=allRows.filter(r=>sel.has(r.id));if(!list.length)return;await pedirNomes(list.flatMap(r=>r.hist.map(h=>h.por)).filter(Boolean),true);await salvarXlsx(planilhaBase(list,true),`cargas_selecionadas_${stamp()}.xlsx`);}
-async function baixarBase(){if(!allRows.length){setToast("Não há cargas para baixar.",true);return;}await pedirNomes(allRows.flatMap(r=>r.hist.map(h=>h.por)).filter(Boolean),true);
+async function exportarSel(){const list=allRows.filter(r=>sel.has(r.id));if(!list.length)return;try{await garantirXLSX();}catch(e){setToast(e.message,true);return;}await pedirNomes(list.flatMap(r=>r.hist.map(h=>h.por)).filter(Boolean),true);await salvarXlsx(planilhaBase(list,true),`cargas_selecionadas_${stamp()}.xlsx`);}
+async function baixarBase(){if(!allRows.length){setToast("Não há cargas para baixar.",true);return;}try{setToast("Preparando a planilha…");await garantirXLSX();}catch(e){setToast(e.message,true);return;}await pedirNomes(allRows.flatMap(r=>r.hist.map(h=>h.por)).filter(Boolean),true);
   const list=allRows.slice().sort((a,b)=>(a.agenda||"9").localeCompare(b.agenda||"9")||a.envio.localeCompare(b.envio)||a.carga.localeCompare(b.carga));
   const ok=await salvarXlsx(planilhaBase(list,true),`Base_Painel_Cargas_${stamp()}.xlsx`); if(ok){marcarSujo(false);render();}}
 
@@ -1139,9 +1481,10 @@ async function exportarHTML(){
   await pedirNomes([...ids],true);
   let porNome=""; try{ if(userNs) porNome=(await userNs.name())||""; }catch(_){}
   const nomes={}; ids.forEach(id=>{if(names[id])nomes[id]=names[id];});
+  if(!porNome&&online) porNome=online.nome||"";
   const dados={geradoEm:new Date().toISOString(),porNome,docs:[...docs.entries()],meta,cfg,nomes};
   const json=JSON.stringify(dados).replace(/</g,"\\u003c");
-  const lib=document.querySelector('script[src*="xlsx"]'), fonts=document.querySelector('link[href*="fonts.googleapis"]');
+  const libEl=document.querySelector('script[src*="xlsx"]'), lib={src:libEl?libEl.src:"https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"}, fonts=document.querySelector('link[href*="fonts.googleapis"]');
   const html='<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
     +'<title>Painel de Cargas – retrato '+stamp()+'</title>'+(fonts?fonts.outerHTML:"")
     +'<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>'+document.getElementById("st").outerHTML+'</head><body>'
@@ -1159,21 +1502,69 @@ function resumo(){
   const hoje=hojeN(), ab=rows.filter(aberta);
   const g=(l)=>{const m=new Map();l.forEach(r=>{const k=r.galpao||"sem galpão";if(!m.has(k))m.set(k,[]);m.get(k).push(r.carga);});return [...m.entries()].map(([k,v])=>`   ${k}: ${v.join(", ")}`).join("\n");};
   const bloco=(t,l)=>l.length?`\n*${t} (${l.length})*\n${g(l)}`:"";
-  const rfHoje=ab.filter(r=>r.cod===1&&r.duRf===0&&r.duLim>0);
+  const rfHoje=ab.filter(r=>r.alerta==="Informar R.F. hoje"), rfAtras=ab.filter(r=>r.alerta==="R.F. atrasado");
   const incluirHoje=ab.filter(r=>r.cod===1&&r.duLim===0), vencido=ab.filter(r=>r.cod===1&&r.duLim!=null&&r.duLim<0);
   const prox=ab.filter(r=>r.cod===1&&r.duLim>0&&r.duLim<=cfg.atencaoDias);
   const risco=ab.filter(r=>r.alerta==="Risco de atraso"), expHoje=ab.filter(r=>r.alerta==="Expedir hoje"), atras=ab.filter(r=>r.alerta==="Expedição atrasada"||r.alerta==="Entrega atrasada"), confEnt=ab.filter(r=>r.alerta==="Confirmar entrega");
   const emProd=ab.filter(r=>r.cod===3), aProd=ab.filter(r=>r.cod===2);
   let t=`*Painel de Cargas · ${brA(hojeIso())} (${wd(hoje)})*${galpaoF?" · "+(galpaoF==="__sem"?"sem galpão":"Galpão "+galpaoF):""}`;
-  t+=bloco("Fora do prazo do cronograma",vencido)+bloco("Informar R.F. hoje",rfHoje)+bloco("Incluir no cronograma hoje",incluirHoje)+bloco(`Incluir nos próximos ${cfg.atencaoDias} d.u.`,prox)+bloco("Expedição atrasada",atras)+bloco("Expedir hoje",expHoje)+bloco("Risco de atraso",risco)+bloco("Confirmar entrega",confEnt);
+  t+=bloco("Fora do prazo do cronograma",vencido)+bloco("R.F. atrasado",rfAtras)+bloco("Informar R.F. hoje",rfHoje)+bloco("Incluir no cronograma hoje",incluirHoje)+bloco(`Incluir nos próximos ${cfg.atencaoDias} d.u.`,prox)+bloco("Expedição atrasada",atras)+bloco("Expedir hoje",expHoje)+bloco("Risco de atraso",risco)+bloco("Confirmar entrega",confEnt);
   t+=`\n\nEm produção: ${emProd.length} · Próximas a produzir: ${aProd.length} · Aguardando cronograma: ${ab.filter(r=>r.cod===1).length} · Em aberto: ${ab.length}`;
-  if(!vencido.length&&!incluirHoje.length&&!atras.length&&!entHoje.length&&!risco.length) t+="\nSem pendências críticas hoje.";
+  const pal=window.PAINEL_EXT&&PAINEL_EXT.paletesSaldo?PAINEL_EXT.paletesSaldo():null;
+  if(pal) t+=`\nSaldo de paletes PBR a devolver: ${pal.saldo} de ${pal.limite}${pal.nivel==="limite"?" · LIMITE ATINGIDO: pedir o retorno":pal.nivel==="aviso"?" · perto do limite":""}`;
+  if(!vencido.length&&!incluirHoje.length&&!atras.length&&!rfAtras.length&&!risco.length) t+="\nSem pendências críticas hoje.";
   return t;
 }
+/* janela de texto pronto para copiar (resumo do dia, mensagens prontas) */
+function janelaTexto(titulo,sub,texto,opcoes){
+  $("#modal").innerHTML=`<div class="modal"><div class="mbox mtxt" role="dialog" aria-modal="true" aria-label="${esc(titulo)}"><div class="mw">
+    <div class="dhead"><div><span class="label">Copiar e colar</span><h2>${esc(titulo)}</h2>${sub?`<span class="small">${sub}</span>`:""}</div><button class="x" data-mclose="1" aria-label="Fechar">×</button></div>
+    ${opcoes||""}
+    <textarea id="txtcopia" spellcheck="false">${esc(texto)}</textarea>
+    <div class="mfoot"><span class="small" id="txtok" role="status"></span><button class="btn ghost" data-mclose="1">Fechar</button><button class="btn" id="txtcopiar">Copiar</button></div>
+  </div></div></div>`;
+  const ta=$("#txtcopia"); if(ta){ta.focus();ta.setSelectionRange(0,0);ta.scrollTop=0;}
+}
+async function copiarTexto(){
+  const ta=$("#txtcopia"), ok=$("#txtok"), bt=$("#txtcopiar"); if(!ta) return;
+  let feito=false;
+  try{ if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(ta.value);feito=true;} }catch(_){}
+  if(!feito){ try{ta.focus();ta.select();feito=document.execCommand("copy");}catch(_){} }
+  if(feito){ if(bt){bt.textContent="Copiado ✓";bt.classList.add("okbtn");setTimeout(()=>{if(bt.isConnected){bt.textContent="Copiar";bt.classList.remove("okbtn");}},2500);} if(ok)ok.textContent="Agora é só colar no Teams, WhatsApp ou e-mail."; }
+  else { ta.focus();ta.select(); if(ok)ok.textContent="Seu navegador bloqueou a cópia automática. O texto já está selecionado: aperte Ctrl+C."; }
+}
 function copiarResumo(){
-  const t=resumo();
-  const fallback=()=>{$("#modal").innerHTML=`<div class="modal" data-mclose="1"><div class="mbox" role="dialog" aria-modal="true" aria-label="Resumo do dia"><div class="mw"><h2>Resumo do dia</h2><p class="small" style="margin:0">Selecione o texto e copie (Ctrl+C).</p><textarea id="restxt" style="min-height:260px;font-family:var(--mono);font-size:13px">${esc(t)}</textarea><div class="mfoot"><button class="btn" data-mclose="1">Fechar</button></div></div></div></div>`;const ta=$("#restxt");ta.focus();ta.select();};
-  try{ navigator.clipboard.writeText(t).then(()=>setToast("Resumo copiado. Cole no Teams ou WhatsApp."),fallback); }catch(e){fallback();}
+  janelaTexto("Resumo do dia","Confira e clique em <b>Copiar</b>. Você pode editar o texto antes.",resumo());
+}
+
+/* ================= mensagens prontas (WhatsApp / Teams) ================= */
+let msgLista=[], msgTipo="rf";
+const MSG_TIPOS=[["rf","Informar R.F."],["exp","Avisar expedição"],["reag","Reagendamento"]];
+function textoMsg(tipo,lista){
+  const porEnv=new Map(); lista.forEach(r=>{const k=r.envio||"(sem envio)";if(!porEnv.has(k))porEnv.set(k,[]);porEnv.get(k).push(r);});
+  const dia=(s)=>s?br(s)+" ("+wdS(s)+")":"—";
+  const linhaCg=(r)=>`• Carga ${r.carga}${r.galpao?" · "+r.galpao:""}${r.volume!=null?" · "+fmtN(r.volume)+(r.volume===1?" palete":" paletes"):""}${r.pbr!=null||r.chep!=null?" (PBR "+(r.pbr??0)+" / CHEP "+(r.chep??0)+")":""}`;
+  const blocos=[...porEnv.entries()].map(([e,l])=>{const a=l[0], tot=l.reduce((s,r)=>s+(r.volume||0),0), lj=[...new Set(l.map(r=>r.loja).filter(Boolean))];
+    const cab=`*Envio ${e}*${lj.length?" · Loja "+lj.join(", "):""}\nAgenda ML: ${dia(a.agenda)}${tot?" · "+fmtN(tot)+" paletes":""}`;
+    if(tipo==="rf") return `${cab}\nCronograma até: ${dia(a.lim)}\n${l.map(linhaCg).join("\n")}`;
+    if(tipo==="exp") return `${cab}\nExpedição: ${dia(a.exp)} (entrega na madrugada da agenda)\n${l.map(linhaCg).join("\n")}`;
+    return `${cab}\n${l.map(linhaCg).join("\n")}\nMotivo: ____\nNova data sugerida: ____`;});
+  const ab={rf:"Bom dia! Segue para R.F. e inclusão no cronograma de produção:",exp:"Bom dia! Aviso de expedição para o Mercado Livre:",reag:"Olá! Precisamos reagendar no portal do Mercado Livre:"}[tipo];
+  const fim={rf:"Por favor, confirmem a inclusão no cronograma. Obrigado!",exp:"Qualquer imprevisto, me avisem. Obrigado!",reag:"Assim que tiver a nova data, atualizo o painel. Obrigado!"}[tipo];
+  return ab+"\n\n"+blocos.join("\n\n")+"\n\n"+fim;
+}
+function abrirMensagens(lista){
+  if(!lista.length) return; msgLista=lista;
+  if(!MSG_TIPOS.some(([k])=>k===msgTipo)) msgTipo="rf";
+  const ops=`<div class="seg" role="group" aria-label="Tipo de mensagem">${MSG_TIPOS.map(([k,n])=>`<button data-msgt="${k}" aria-pressed="${msgTipo===k}">${n}</button>`).join("")}</div>`;
+  janelaTexto("Mensagem pronta",`${pl(lista.length,"carga")} em ${pl(new Set(lista.map(r=>r.envio)).size,"envio")}. Escolha o tipo, ajuste o texto se quiser e copie.`,textoMsg(msgTipo,lista),ops);
+}
+async function expedirEnvio(env){
+  const ids=allRows.filter(r=>r.envio===env&&r.cod===4).map(r=>r.id); if(!ids.length) return;
+  const now=new Date().toISOString(); let ok=0, err=null;
+  await emLotes(ids,4,async(id)=>{const d=docs.get(id);try{await db.collection("cargas").doc(id).update({status:5,hist:(d.hist||[]).concat([{tipo:"status",de:4,para:5,em:hojeIso(),reg:now,por:meId||null,origem:"painel"}]),atualizadoEm:now,atualizadoPor:meId||null});ok++;}catch(e){err=e;}});
+  if(ok) marcarSujo(true);
+  setToast(err?`${ok} de ${ids.length} atualizadas. ${erroTxt(err)}`:`Envio ${env}: ${pl(ok,"carga")} → Expedida (hoje).`,!!err);
 }
 
 /* ================= importação com conferência ================= */
@@ -1233,17 +1624,20 @@ function lerPlanilha(buf){
     const hi=a.findIndex(row=>row.some(c=>norm(c)==="ENVIO")&&row.some(c=>norm(c).startsWith("CARGA")));
     if(hi<0) continue;
     const h=a[hi].map(norm), col=(...ks)=>h.findIndex(x=>ks.some(k=>x.includes(k)));
-    const ci={envio:h.indexOf("ENVIO"),carga:h.findIndex(x=>x.startsWith("CARGA")),galpao:col("GALPAO","GALPOES"),loja:col("LOJA"),rot:col("ROTERIZ","ROTEIRIZ"),agenda:h.findIndex(x=>x.includes("AGENDA")&&!x.includes("CRONOGRAMA")),status:col("STATUS"),obs:col("OBS"),volume:col("PALETE","VOLUME")};
+    const ci={envio:h.indexOf("ENVIO"),carga:h.findIndex(x=>x.startsWith("CARGA")),galpao:col("GALPAO","GALPOES"),loja:col("LOJA"),rot:col("ROTERIZ","ROTEIRIZ"),agenda:h.findIndex(x=>x.includes("AGENDA")&&!x.includes("CRONOGRAMA")),status:col("STATUS"),obs:col("OBS"),
+      volume:h.findIndex(x=>(x.includes("PALETE")||x.includes("VOLUME"))&&!x.includes("PBR")&&!x.includes("CHEP")),pbr:col("PBR"),chep:col("CHEP"),rf:col("RFINFORMADO")};
     const linhas=[];
     a.slice(hi+1).forEach((row,i)=>{
       const env=row[ci.envio]; if((env===""||env==null)&&(ci.carga<0||row[ci.carga]===""||row[ci.carga]==null)) return;
       const g=k=>ci[k]<0?"":row[ci[k]];
       const vr=g("volume"); const vol=vr===""||vr==null?null:Number(String(vr).replace(",","."));
-      const base={linha:hi+i+2,envio:String(env??"").trim(),galpao:String(g("galpao")||"").trim(),loja:String(g("loja")??"").trim(),rot:toISO(g("rot")),agenda:toISO(g("agenda")),statusTxt:String(g("status")||"").trim(),obs:String(g("obs")||"").trim(),volume:vol,volRaw:vr};
+      const inteiro=v=>{if(v===""||v==null)return null;const n=Number(String(v).replace(",","."));return Number.isFinite(n)&&n>=0?Math.round(n):null;};
+      const rfv=g("rf"); const rfIso=rfv instanceof Date?new Date(rfv.getTime()).toISOString():rfv!==""&&rfv!=null?(()=>{const d=toISO(rfv);return d&&d!=="?"?d+"T12:00:00.000Z":null;})():null;
+      const base={linha:hi+i+2,envio:String(env??"").trim(),galpao:String(g("galpao")||"").trim(),loja:String(g("loja")??"").trim(),rot:toISO(g("rot")),agenda:toISO(g("agenda")),statusTxt:String(g("status")||"").trim(),obs:String(g("obs")||"").trim(),volume:vol,volRaw:vr,pbr:inteiro(g("pbr")),chep:inteiro(g("chep")),rf:rfIso};
       const cargas=String(g("carga")).split(/[\/;,]/).map(x=>x.trim()).filter(Boolean);
       (cargas.length?cargas:[""]).forEach(c=>linhas.push({...base,carga:c}));
     });
-    return {aba:nome,linhas,temGalpao:ci.galpao>=0,temLoja:ci.loja>=0,temVolume:ci.volume>=0,temStatus:ci.status>=0,hist:lerHist(wb),regras:lerRegras(wb,a.slice(0,hi))};
+    return {aba:nome,linhas,temGalpao:ci.galpao>=0,temLoja:ci.loja>=0,temVolume:ci.volume>=0,temPbr:ci.pbr>=0||ci.chep>=0,temRf:ci.rf>=0,temStatus:ci.status>=0,hist:lerHist(wb),regras:lerRegras(wb,a.slice(0,hi))};
   }
   throw new Error("Não achei o cabeçalho com #ENVIO e CARGA em nenhuma aba. Use a planilha padrão (botão Baixar base).");
 }
@@ -1256,11 +1650,12 @@ function lerHist(wb){
   a.slice(1).forEach(r=>{
     const env=String(r[c.envio]??"").trim(), car=String(r[c.carga]??"").trim(); if(!env||!car) return;
     const tipoN=norm(r[c.tipo]); const st=tipoN==="STATUS";
-    const tipo=st?"status":({AGENDA:"agenda",GALPAO:"galpao",LOJA:"loja",ROT:"rot",VOLUME:"volume"}[tipoN]||String(r[c.tipo]).toLowerCase());
+    const tipo=st?"status":({AGENDA:"agenda",GALPAO:"galpao",LOJA:"loja",ROT:"rot",VOLUME:"volume",PBR:"pbr",CHEP:"chep",RF:"rf"}[tipoN]||String(r[c.tipo]).toLowerCase());
     const val=v=>{if(v instanceof Date) return toISO(v); return v===""||v==null?"":String(v);};
     let de=r[c.de], para=r[c.para];
     if(st){de=de===""||de==null?null:codTexto(de);para=codTexto(para);if(para==null)return;if(de===undefined)de=null;}
-    else{de=val(de);para=val(para);if(tipo==="volume"){de=de===""?"":Number(de);para=para===""?"":Number(para);}}
+    else if(tipo==="rf"){de=String(de).toLowerCase()==="true";para=String(para).toLowerCase()==="true";}
+    else{de=val(de);para=val(para);if(["volume","pbr","chep"].includes(tipo)){de=de===""?"":Number(de);para=para===""?"":Number(para);}}
     const reg=r[c.reg] instanceof Date?r[c.reg].toISOString():String(r[c.reg]||"");
     const em=c.em>=0?toISO(r[c.em]):""; const o=norm(c.origem>=0?r[c.origem]:"");
     const e={tipo,de,para,em:em==="?"?"":em,reg,por:null,porNome:c.quem>=0?String(r[c.quem]||""):"",origem:o.startsWith("PLANILHA")?"base":o.startsWith("WMS")?"wms":o.startsWith("SITUACAO")?"inicial":"painel"};
@@ -1271,17 +1666,19 @@ function lerHist(wb){
 function lerRegras(wb,topo){
   const r={}; let achou=false;
   // 1) campo da regra no topo da aba BASE (ex.: I1 "DIAS ÚTEIS ANTES DA AGENDA", I2 = 3)
-  (topo||[]).forEach((row,ri)=>row.forEach((c,ci)=>{ const k=norm(c); if(!k.includes("DIASUTEIS")) return; const campo=k.includes("RF")?"rfDias":"regraDias"; if(r[campo]!=null) return;
+  (topo||[]).forEach((row,ri)=>row.forEach((c,ci)=>{ const k=norm(c);
+    if(k.includes("REGRADATERCA")&&r.regraTerca==null){const v=(topo[ri+1]||[])[ci];if(v!==""&&v!=null)r.regraTerca=Number(v)===1||norm(v)==="SIM";return;}
+    if(!k.includes("DIASUTEIS")) return; const campo=k.includes("RF")?"rfDias":"regraDias"; if(r[campo]!=null) return;
     const cand=[(topo[ri+1]||[])[ci],row[ci+1]]; for(const v of cand){const n=Number(String(v).replace(",","."));if(v!==""&&v!=null&&Number.isInteger(n)){r[campo]=n;break;}} }));
   // 2) aba REGRAS
   const nr=wb.SheetNames.find(n=>norm(n)==="REGRAS"); let ferR=null;
   if(nr){ achou=true; ferR=[]; XLSX.utils.sheet_to_json(wb.Sheets[nr],{header:1,raw:true,defval:""}).slice(1).forEach(x=>{const k=norm(x[0]);
-    if(k.startsWith("DIASUTEIS")&&k.includes("RF")){if(r.rfDias==null)r.rfDias=Number(x[1]);}else if(k.startsWith("DIASUTEIS")&&r.regraDias==null)r.regraDias=Number(x[1]);else if(k.startsWith("ALERTA"))r.atencaoDias=Number(x[1]);else if(k.startsWith("FERIADO")){const d=toISO(x[1]);if(d&&d!=="?")ferR.push(d);}}); }
+    if(k.startsWith("DIASUTEIS")&&k.includes("RF")){if(r.rfDias==null)r.rfDias=Number(x[1]);}else if(k.startsWith("DIASUTEIS")&&r.regraDias==null)r.regraDias=Number(x[1]);else if(k.startsWith("ALERTA"))r.atencaoDias=Number(x[1]);else if(k.startsWith("REGRADATERCA")){if(r.regraTerca==null)r.regraTerca=Number(x[1])===1||norm(x[1])==="SIM";}else if(k.startsWith("FERIADO")){const d=toISO(x[1]);if(d&&d!=="?")ferR.push(d);}}); }
   // 3) aba FERIADOS: o que não for feriado nacional vira feriado extra
   const nf=wb.SheetNames.find(n=>norm(n)==="FERIADOS"); let ferF=null;
   if(nf){ ferF=[]; XLSX.utils.sheet_to_json(wb.Sheets[nf],{header:1,raw:true,defval:""}).slice(1).forEach(x=>{const d=toISO(x[0]);if(!d||d==="?")return;
     const y=+d.slice(0,4); if(!feriadosNac(y).some(f=>f.d===d)) ferF.push(d);}); }
-  if(r.regraDias==null&&r.rfDias==null&&!achou&&ferF==null) return null;
+  if(r.regraDias==null&&r.rfDias==null&&r.regraTerca==null&&!achou&&ferF==null) return null;
   if(!(r.rfDias>=0&&r.rfDias<=10)) r.rfDias=null;
   if(!(r.regraDias>=1&&r.regraDias<=20)) r.regraDias=null;
   if(!(r.atencaoDias>=0&&r.atencaoDias<=10)) r.atencaoDias=null;
@@ -1289,7 +1686,8 @@ function lerRegras(wb,topo){
   return r;
 }
 function diffRegras(rg){ // o que a planilha muda nas regras atuais
-  if(!rg) return null; const n={regraDias:cfg.regraDias,rfDias:cfg.rfDias,atencaoDias:cfg.atencaoDias,feriadosExtras:(cfg.feriadosExtras||[]).slice().sort()}; const t=[];
+  if(!rg) return null; const n={regraDias:cfg.regraDias,rfDias:cfg.rfDias,atencaoDias:cfg.atencaoDias,regraTerca:cfg.regraTerca,feriadosExtras:(cfg.feriadosExtras||[]).slice().sort()}; const t=[];
+  if(rg.regraTerca!=null&&rg.regraTerca!==cfg.regraTerca){t.push(rg.regraTerca?"liga a regra da terça (R.F. na sexta)":"desliga a regra da terça");n.regraTerca=rg.regraTerca;}
   if(rg.regraDias!=null&&rg.regraDias!==cfg.regraDias){t.push(`regra de ${cfg.regraDias} para ${pl(rg.regraDias,"dia útil","dias úteis")} antes da agenda`);n.regraDias=rg.regraDias;}
   if(rg.rfDias!=null&&rg.rfDias!==cfg.rfDias){t.push(`informar R.F. de ${cfg.rfDias} para ${pl(rg.rfDias,"dia útil","dias úteis")} antes do cronograma`);n.rfDias=rg.rfDias;}
   if(rg.atencaoDias!=null&&rg.atencaoDias!==cfg.atencaoDias){t.push(`alerta de atenção de ${cfg.atencaoDias} para ${rg.atencaoDias} d.u.`);n.atencaoDias=rg.atencaoDias;}
@@ -1401,6 +1799,8 @@ function prever(arquivo,lp){
     if(!ex){ const bh=hp||[]; novas.push({id,l,status:sc!=null?sc:(ultimoStatus(bh)??1),baseHist:bh}); return; }
     const camp={}; [["envio",l.envio],["galpao",l.galpao],["loja",l.loja],["rot",l.rot],["agenda",l.agenda],["obs",l.obs]].forEach(([k,v])=>{ if((k==="envio"||k==="agenda")&&!v) return; if(k==="galpao"&&!lp.temGalpao) return; if(k==="loja"&&!lp.temLoja) return; if(String(v||"")!==String(ex[k]||"")) camp[k]=v; });
     if(lp.temVolume){const ov=typeof ex.volume==="number"?ex.volume:null; if(l.volume!==ov) camp.volume=l.volume;}
+    if(lp.temPbr){["pbr","chep"].forEach(k=>{const ov=typeof ex[k]==="number"?ex[k]:null; if(l[k]!==ov&&!(l[k]==null&&!modoLocal)) camp[k]=l[k];});}
+    if(lp.temRf&&l.rf&&!(ex.rfInfo&&ex.rfInfo.em)&&(typeof ex.status==="number"?ex.status:1)===1) camp.rfInfo={em:l.rf,por:null,porNome:"planilha"};
     const at=typeof ex.status==="number"?ex.status:1; let st=null;
     if(sc!=null&&sc!==at){ if(POS(sc)>POS(at)) st=sc; else atras.push({id,l,de:at,para:sc,baseHist:ex.hist||[]}); }
     if(st!=null||Object.keys(camp).length||histMudou) mud.push({id,l,camp,de:at,para:st,baseHist:ex.hist||[],histMudou}); else if(!(sc!=null&&sc!==at)) iguais.push(id);
@@ -1416,7 +1816,7 @@ function renderImp(){
   if(imp.tipo==="wms") return renderImpWMS();
   const p=imp, ne=p.probs.filter(x=>x.sev==="e").length, nw=p.probs.length-ne;
   const nStatus=p.mud.filter(m=>m.para!=null).length+(p.aplicarAtras?p.atras.length:0);
-  const linhaMud=(m)=>{const parts=[];if(m.histMudou&&m.para==null&&!Object.keys(m.camp).length)parts.push("histórico atualizado pela planilha");if(m.para!=null)parts.push(`${ST[m.de].nome} → <b>${ST[m.para].nome}</b>`);Object.entries(m.camp).forEach(([k,v])=>{const n={galpao:"galpão",loja:"loja",rot:"roteirização",agenda:"agenda",obs:"obs.",volume:"volume"}[k];parts.push(`${n}: ${k==="agenda"||k==="rot"?br(v):esc(v===null?"—":v)||"—"}`);});return `<li><span class="mono"><b>${esc(m.l.carga)}</b></span><span>${parts.join(" · ")}</span></li>`;};
+  const linhaMud=(m)=>{const parts=[];if(m.histMudou&&m.para==null&&!Object.keys(m.camp).length)parts.push("histórico atualizado pela planilha");if(m.para!=null)parts.push(`${ST[m.de].nome} → <b>${ST[m.para].nome}</b>`);Object.entries(m.camp).forEach(([k,v])=>{const n={galpao:"galpão",loja:"loja",rot:"roteirização",agenda:"agenda",obs:"obs.",volume:"paletes",pbr:"PBR",chep:"CHEP",envio:"envio",rfInfo:"R.F."}[k]||k;parts.push(k==="rfInfo"?"R.F. informado ✓":`${n}: ${k==="agenda"||k==="rot"?br(v):esc(v===null?"—":v)||"—"}`);});return `<li><span class="mono"><b>${esc(m.l.carga)}</b></span><span>${parts.join(" · ")}</span></li>`;};
   let corpo;
   if(p.fase==="previa"){
     corpo=`<div class="sumg"><div><span class="label">Novas</span><b>${p.novas.length}</b></div><div><span class="label">Com mudanças</span><b>${p.mud.length}</b></div><div><span class="label">Sem mudança</span><b>${p.iguais.length}</b></div><div><span class="label">Problemas</span><b style="color:var(${ne?"--crit":nw?"--warn":"--ok"})">${p.probs.length}</b></div></div>
@@ -1446,11 +1846,11 @@ async function gravarImp(){
   const tarefas=[];
   p.novas.forEach(n=>{const l=n.l;const bh=n.baseHist||[];const ult=ultimoStatus(bh);
     const hist=bh.length?bh.concat(ult!==n.status?[{tipo:"status",de:ult,para:n.status,em,reg:now,por,origem:"base"}]:[]):[{tipo:"status",de:null,para:n.status,em,reg:now,por,origem:"base"}];
-    tarefas.push(()=>db.collection("cargas").doc(n.id).set({envio:l.envio,carga:l.carga,galpao:l.galpao,loja:l.loja,rot:l.rot,agenda:l.agenda,volume:l.volume,obs:l.obs,status:n.status,
+    tarefas.push(()=>db.collection("cargas").doc(n.id).set({envio:l.envio,carga:l.carga,galpao:l.galpao,loja:l.loja,rot:l.rot,agenda:l.agenda,volume:l.volume,pbr:l.pbr??null,chep:l.chep??null,rfInfo:l.rf?{em:l.rf,por:null,porNome:"planilha"}:null,obs:l.obs,status:n.status,
     hist,criadoEm:now,atualizadoEm:now,atualizadoPor:por}));});
   const muds=p.mud.slice(); if(p.aplicarAtras) p.atras.forEach(a=>{const m=muds.find(x=>x.id===a.id); if(m) m.para=a.para; else muds.push({id:a.id,l:a.l,camp:{},de:a.de,para:a.para,baseHist:a.baseHist});});
   muds.forEach(m=>tarefas.push(()=>{const d=docs.get(m.id)||{};const ent=[];const patch={...m.camp};
-    Object.keys(m.camp).forEach(k=>{if(k!=="obs")ent.push({tipo:k,de:d[k]==null?"":d[k],para:m.camp[k]==null?"":m.camp[k],em,reg:now,por,origem:"base"});});
+    Object.keys(m.camp).forEach(k=>{if(k==="rfInfo")ent.push({tipo:"rf",de:false,para:true,em,reg:now,por,origem:"base"});else if(k!=="obs")ent.push({tipo:k,de:d[k]==null?"":d[k],para:m.camp[k]==null?"":m.camp[k],em,reg:now,por,origem:"base"});});
     if(m.para!=null){patch.status=m.para;ent.push({tipo:"status",de:m.de,para:m.para,em,reg:now,por,origem:"base"});}
     patch.hist=(m.baseHist||(Array.isArray(d.hist)?d.hist:[])).concat(ent);if(m.para==null&&m.histMudou){const u=ultimoStatus(m.baseHist);if(u!=null)patch.status=u;}patch.atualizadoEm=now;patch.atualizadoPor=por;
     return db.collection("cargas").doc(m.id).update(patch);}));
@@ -1483,6 +1883,7 @@ function renderCfg(){
     <div class="fgrid"><label>Dias úteis antes da agenda para entrar no cronograma<input type="number" id="cfreg" min="1" max="20" value="${esc(c.regraDias)}"></label>
     <label>Informar R.F. quantos dias úteis antes do cronograma<input type="number" id="cfrf" min="0" max="10" value="${esc(c.rfDias)}"></label>
     <label>Alerta "Atenção" quando faltam até (dias úteis)<input type="number" id="cfat" min="0" max="10" value="${esc(c.atencaoDias)}"></label></div>
+    <label class="ck cfter"><input type="checkbox" id="cfter" ${c.regraTerca?"checked":""}><span><b>Regra da terça</b>: carga com agenda na terça tem o R.F. informado <b>na sexta anterior</b> (não antes; se a sexta for feriado, no dia útil anterior) e entra no cronograma até o <b>sábado</b>, para produzir no fim de semana e expedir na segunda.</span></label>
     <label style="display:grid;gap:4px;font-size:13px;font-weight:600">Feriados e dias sem expediente, além dos nacionais (um por linha, dd/mm/aaaa)<textarea id="cffer" style="min-height:120px;font-family:var(--mono)">${esc(c.fer)}</textarea></label>
     <span class="small">Já incluídos automaticamente: Confraternização, Sexta-feira Santa, Tiradentes, Dia do Trabalho, Independência, N. Sra. Aparecida, Finados, Proclamação da República, Consciência Negra e Natal. Carnaval e Corpus Christi não estão incluídos.</span>
     <div class="mfoot"><span class="toast err" id="cfmsg"></span><button class="btn ghost" data-mclose="1">Cancelar</button><button class="btn" id="cfsave">Salvar regras</button></div>
@@ -1492,7 +1893,7 @@ async function mudarRegra(delta,campo){
   campo=campo||"regraDias"; const lim=campo==="rfDias"?[0,10]:[1,20];
   const novo=Math.max(lim[0],Math.min(lim[1],cfg[campo]+delta)); if(novo===cfg[campo]||salvandoRegra) return;
   const antes=cfg[campo]; salvandoRegra=true; render();
-  try{ await db.doc("config/geral").set({...cfg,[campo]:novo,feriadosExtras:cfg.feriadosExtras||[],atualizadoEm:new Date().toISOString(),atualizadoPor:meId||null});
+  try{ await db.doc("config/geral").set({...cfg,[campo]:novo,regraTerca:cfg.regraTerca,feriadosExtras:cfg.feriadosExtras||[],atualizadoEm:new Date().toISOString(),atualizadoPor:meId||null});
     salvandoRegra=false; marcarSujo(true);
     const oque=campo==="rfDias"?`Informar R.F. alterado de ${antes} para ${pl(novo,"dia útil","dias úteis")} antes do cronograma`:`Regra alterada de ${antes} para ${pl(novo,"dia útil","dias úteis")} antes da agenda`;
     setToast(`${oque}. As datas e os alertas foram recalculados${modoLocal?". Clique em Baixar base para levar a regra na planilha.":" para toda a equipe."}`); }
@@ -1503,7 +1904,7 @@ async function salvarCfg(){
   const linhas=$("#cffer").value.split(/\n|;|,/).map(s=>s.trim()).filter(Boolean); const fer=[]; const bad=[];
   linhas.forEach(s=>{const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);if(m)fer.push(iso(+m[3],+m[2],+m[1]));else bad.push(s);});
   if(!(reg>=1&&reg<=20)||!(at>=0&&at<=10)||!(rfd>=0&&rfd<=10)||bad.length){$("#cfmsg").textContent=bad.length?"Data inválida: "+bad[0]:"Confira os números.";return;}
-  try{ await db.doc("config/geral").set({regraDias:reg,rfDias:rfd,atencaoDias:at,feriadosExtras:[...new Set(fer)].sort(),atualizadoEm:new Date().toISOString(),atualizadoPor:meId||null}); cfgOpen=false; renderCfg(); marcarSujo(true); setToast(modoLocal?"Regras salvas. Clique em Baixar base para levar as regras na planilha.":"Regras salvas para toda a equipe."); }
+  try{ await db.doc("config/geral").set({regraDias:reg,rfDias:rfd,atencaoDias:at,regraTerca:!!($("#cfter")&&$("#cfter").checked),feriadosExtras:[...new Set(fer)].sort(),atualizadoEm:new Date().toISOString(),atualizadoPor:meId||null}); cfgOpen=false; renderCfg(); marcarSujo(true); setToast(modoLocal?"Regras salvas. Clique em Baixar base para levar as regras na planilha.":"Regras salvas para toda a equipe."); }
   catch(e){ $("#cfmsg").textContent=erroTxt(e); }
 }
 
@@ -1520,7 +1921,7 @@ async function pedirNomes(ids,esperar){
 document.addEventListener("click",e=>{
   const t=e.target;
   if(t.closest("[data-tema]")){tema=tema==="auto"?"escuro":tema==="escuro"?"claro":"auto";try{localStorage.setItem("painel-tema",tema);}catch(_){};aplicaVisual();render();return;}
-  const kp=t.closest("[data-kpi]"); if(kp){const k=kp.dataset.kpi; if(k==="prox"&&kp.dataset.id){abrir(kp.dataset.id);return;}
+  const kp=t.closest("[data-kpi]"); if(kp){const k=kp.dataset.kpi; if(k==="prox"&&kp.dataset.id){abrir(kp.dataset.id);return;} if(k==="pbr"){location.hash="#paletes";return;}
     filtro=k==="crit"?"crit":k==="prod"?"3":"abertas"; if(view()!=="painel") location.hash="#painel"; else render();
     setTimeout(()=>{const b=document.querySelector(".fila");if(b)b.scrollIntoView({behavior:"smooth",block:"start"});},60);return;}
   if(t.closest("#limpabusca")){busca="";render();return;}
@@ -1530,6 +1931,13 @@ document.addEventListener("click",e=>{
   const lj=t.closest("[data-loja]"); if(lj){lojaF=lojaF===lj.dataset.loja?"":lj.dataset.loja;render();return;}
   const op=t.closest("[data-open]"); if(op){abrir(op.dataset.open);return;}
   const adv=t.closest("[data-adv]"); if(adv){avancar(adv.dataset.adv);return;}
+  const rf1=t.closest("[data-rf1]"); if(rf1){const d=docs.get(rf1.dataset.rf1); marcarRF([rf1.dataset.rf1],!(d&&d.rfInfo&&d.rfInfo.em)); return;}
+  const xe=t.closest("[data-expenv]"); if(xe){expedirEnvio(xe.dataset.expenv);return;}
+  const mg=t.closest("[data-msg]"); if(mg){const r=allRows.find(x=>x.id===mg.dataset.msg); if(r) msgTipo=r.cod===1?"rf":"exp"; if(r) abrirMensagens(r.envio?allRows.filter(x=>x.envio===r.envio&&x.cod!==0):[r]); return;}
+  const mt=t.closest("[data-msgt]"); if(mt){msgTipo=mt.dataset.msgt; abrirMensagens(msgLista); return;}
+  if(t.closest("#txtcopiar")){copiarTexto();return;}
+  if(t.closest("#brf")){marcarRF([...sel].filter(id=>docs.has(id)),true);return;}
+  if(t.closest("#bmsg")){const l=allRows.filter(r=>sel.has(r.id)); msgTipo=l.every(r=>r.cod===1)?"rf":"exp"; abrirMensagens(allRows.filter(r=>sel.has(r.id)));return;}
   const f=t.closest("[data-f]"); if(f){const k=f.dataset.f;filtro=(filtro===k&&!["abertas","todas","crit","sel"].includes(k))?"abertas":k;render();return;}
   const cal=t.closest("[data-cal]"); if(cal){const n=+cal.dataset.cal;calStart=n===0?segunda(hojeN()):(calStart??segunda(hojeN()))+n;render();return;}
   const cm=t.closest("[data-calm]"); if(cm){calModo=cm.dataset.calm;render();return;}
@@ -1555,7 +1963,7 @@ document.addEventListener("click",e=>{
   if(t.closest("#ddelno")){dConfirmDel=false;renderDrawer();return;}
   if(t.closest("#ddel2")){excluir();return;}
   if(t.closest("#impok")){gravarImp();return;}
-  if(t.closest("#cfg")){cfgOpen=true;cfgDraft={regraDias:cfg.regraDias,rfDias:cfg.rfDias,atencaoDias:cfg.atencaoDias,fer:(cfg.feriadosExtras||[]).map(brA).join("\n")};renderCfg();return;}
+  if(t.closest("#cfg")){cfgOpen=true;cfgDraft={regraDias:cfg.regraDias,rfDias:cfg.rfDias,atencaoDias:cfg.atencaoDias,regraTerca:cfg.regraTerca,fer:(cfg.feriadosExtras||[]).map(brA).join("\n")};renderCfg();return;}
   if(t.closest("#cfsave")){salvarCfg();return;}
   const rgb=t.closest("[data-regra]"); if(rgb&&!rgb.disabled){mudarRegra(Number(rgb.dataset.regra),"regraDias");return;}
   const rfb=t.closest("[data-rf]"); if(rfb&&!rfb.disabled){mudarRegra(Number(rfb.dataset.rf),"rfDias");return;}
@@ -1579,12 +1987,12 @@ document.addEventListener("change",e=>{
 });
 document.addEventListener("input",e=>{
   const t=e.target; if(!dForm&&t.id!=="busca"&&t.id!=="ben") return;
-  const map={dem:"em",den:"envio",dag:"agenda",dga:"galpao",dlj:"loja",dro:"rot",dvo:"volume",dob:"obs"};
+  const map={dem:"em",den:"envio",dag:"agenda",dga:"galpao",dlj:"loja",dro:"rot",dvo:"volume",dpb:"pbr",dch:"chep",dob:"obs"};
   if(map[t.id]&&dForm){dForm[map[t.id]]=t.value;return;}
   if(t.id==="ben"){bulkEnvio=t.value;return;}
   if(t.id==="busca"){busca=t.value;clearTimeout(buscaT);buscaT=setTimeout(()=>{const pos=($("#busca")||{}).selectionStart;render();const b=$("#busca");if(b){b.focus();try{b.setSelectionRange(pos,pos);}catch(_){}}},180);}
 });
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(imp&&imp.fase!=="gravando"){imp=null;$("#modal").innerHTML="";}else if(cfgOpen){cfgOpen=false;renderCfg();}else if(openId)fechar();}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(imp&&imp.fase!=="gravando"){imp=null;$("#modal").innerHTML="";}else if(cfgOpen){cfgOpen=false;renderCfg();}else if($("#txtcopia")){$("#modal").innerHTML="";}else if(openId)fechar();}});
 function focoEnvio(env){const cal=document.querySelector(".cal,.mcal");if(!cal)return;
   document.querySelectorAll(".cc.hl").forEach(x=>x.classList.remove("hl"));
   if(!env){cal.classList.remove("foco");return;}
@@ -1594,9 +2002,40 @@ document.addEventListener("mouseover",e=>{const c=e.target.closest&&e.target.clo
 document.addEventListener("focusin",e=>{const c=e.target.closest&&e.target.closest(".cc.conj");focoEnvio(c?c.dataset.env:null);});
 window.addEventListener("hashchange",()=>{render();window.scrollTo(0,0);});
 
+/* ================= tour de boas-vindas ================= */
+let tourI=-1, tourPassos=[];
+const TOUR=[
+  [".kpis","Cartões do topo","O que está em produção, o que expede hoje, as atrasadas e a próxima carga. Clique num cartão para ir direto à lista."],
+  [".tabs","Abas","Painel, Calendário, Indicadores, Ocorrências e Histórico. A busca do topo vale para todas."],
+  ["#busca","Busca","Digite o número da carga, do envio, o galpão ou a loja."],
+  [".prod .card","Cartão da carga","Clique no número para ver os detalhes, mudar o status e copiar mensagens prontas. Os botões de baixo avançam a etapa e marcam o R.F. informado."],
+  ["#resumo","Resumo do dia","Monta o texto do dia para colar no Teams ou WhatsApp."],
+  ['.tabs a[href="#ajuda"]',"Ajuda","Tudo explicado por perfil. O tour pode ser revisto por lá."]];
+const tourChave=()=>"painel-tour-v1-"+(meId||"local");
+function tourTalvez(){ if(tourI>=0||retrato||!loaded||!docs.size||view()!=="painel"||openId||imp) return; try{if(localStorage.getItem(tourChave()))return;}catch(_){return;} setTimeout(()=>{if(tourI<0&&view()==="painel")tourIniciar();},700); }
+function tourIniciar(){ if(view()!=="painel"){location.hash="#painel";} tourPassos=TOUR.filter(([sel])=>document.querySelector(sel)); if(!tourPassos.length) return; tourI=0; tourDesenhar(); }
+function tourFim(){ tourI=-1; const el=$("#tour"); if(el) el.remove(); try{localStorage.setItem(tourChave(),"1");}catch(_){} }
+function tourDesenhar(){
+  let el=$("#tour"); if(!el){el=document.createElement("div");el.id="tour";document.body.appendChild(el);}
+  const [sel,tit,txt]=tourPassos[tourI]; const alvo=document.querySelector(sel); if(!alvo){tourFim();return;}
+  alvo.scrollIntoView({block:"center",behavior:"instant"});
+  const r=alvo.getBoundingClientRect(), pad=6, W=Math.min(340,innerWidth-24);
+  const abaixo=r.bottom+180<innerHeight||r.top<200;
+  const top=abaixo?Math.min(innerHeight-170,r.bottom+pad+10):Math.max(12,r.top-pad-10-160);
+  const left=Math.max(12,Math.min(innerWidth-W-12,r.left));
+  el.innerHTML=`<div class="tourhl" style="top:${r.top-pad}px;left:${r.left-pad}px;width:${r.width+pad*2}px;height:${r.height+pad*2}px"></div>
+    <div class="tourbox" role="dialog" aria-modal="true" aria-label="Tour" style="top:${top}px;left:${left}px;width:${W}px"><span class="label">Passo ${tourI+1} de ${tourPassos.length}</span><h3>${tit}</h3><p>${txt}</p>
+    <div class="mfoot"><button class="btn ghost sm" data-tour="sair">Pular</button>${tourI>0?`<button class="btn ghost sm" data-tour="-1">Voltar</button>`:""}<button class="btn sm" data-tour="1">${tourI===tourPassos.length-1?"Concluir":"Próximo"}</button></div></div>`;
+  const b=el.querySelector('[data-tour="1"]'); if(b) b.focus();
+}
+document.addEventListener("click",e=>{const t=e.target.closest&&e.target.closest("[data-tour]"); if(t){const a=t.dataset.tour; if(a==="sair"){tourFim();return;} tourI+=Number(a); if(tourI>=tourPassos.length) tourFim(); else tourDesenhar(); return;}
+  if(e.target.closest&&e.target.closest("#vertour")){try{localStorage.removeItem(tourChave());}catch(_){} location.hash="#painel"; setTimeout(tourIniciar,300);}},true);
+window.addEventListener("resize",()=>{if(tourI>=0)tourDesenhar();});
+document.addEventListener("keydown",e=>{if(tourI>=0&&e.key==="Escape"){e.stopPropagation();tourFim();}},true);
+
 /* ================= ponte com as abas online ================= */
 window.PAINEL_API={ST,cargas:()=>allRows,busca:()=>busca,rerender:()=>{if(!openId)render();else{render();}},toast:(t,e)=>setToast(t,e),cfg:()=>cfg,
-  abrirRegras:()=>{cfgOpen=true;cfgDraft={regraDias:cfg.regraDias,rfDias:cfg.rfDias,atencaoDias:cfg.atencaoDias,fer:(cfg.feriadosExtras||[]).map(brA).join("\n")};renderCfg();}};
+  abrirRegras:()=>{cfgOpen=true;cfgDraft={regraDias:cfg.regraDias,rfDias:cfg.rfDias,atencaoDias:cfg.atencaoDias,regraTerca:cfg.regraTerca,fer:(cfg.feriadosExtras||[]).map(brA).join("\n")};renderCfg();}};
 
 /* ================= inicialização ================= */
 async function iniciar(){

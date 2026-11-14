@@ -58,6 +58,17 @@ A regra acordada com a operação é aplicada sozinha:
 | 🕓 | **Histórico** | Toda alteração com data, hora e quem fez, gravada pelo banco (não dá para editar) |
 | 🗂️ | **Cadastro** | Equipes, funções, perfis, lojas, galpões, tipos de ocorrência e código do time |
 | ✉️ | **E-mails automáticos** | Resumo do dia (horário e destinatários editáveis) e relatório semanal de uso |
+| ✅ | **R.F. informado** | Marca na carga (ou em lote) quem informou o R.F. e quando; o alerta sai |
+| 📅 | **Regra da terça** | Agenda na terça: R.F. na sexta anterior e cronograma até o sábado da produção |
+| 📦 | **Paletes PBR** | Saldo de PBR enviados e não devolvidos, retornos, previsão com as cargas agendadas e alerta perto do limite (só o Administrador Master) |
+| 💬 | **Mensagens prontas** | Textos para WhatsApp e Teams: informar R.F., avisar expedição e reagendamento |
+| 🧩 | **Pendências de cadastro** | Cargas em aberto sem envio, agenda, galpão, loja, paletes ou PBR e CHEP |
+| 🟢 | **Quem está online** | Iniciais de quem está com o painel aberto |
+| 🟦 | **Microsoft Teams** | Resumo do dia e alertas de paletes num canal, via Workflows |
+| 💾 | **Backup semanal** | A base inteira em Excel anexada ao relatório semanal |
+| 🛡️ | **Segurança** | Bloqueio após 5 senhas erradas, senha mínima de 8, CSP e cabeçalhos de segurança, leitura só para quem tem perfil |
+| 📱 | **Celular** | Abas fixas embaixo e cartões compactos |
+| 🛰️ | **Visual "torre de controle"** | Página de entrada animada, painéis de vidro escuro e o fluxo das cargas animado |
 | 🗄️ | **Arquivamento** | Cargas encerradas saem do painel após 60 dias e são apagadas após 12 meses |
 | 🌗 | **Tema** | Auto, escuro ou claro |
 | ❓ | **Ajuda** | Guia dentro do próprio site, de acordo com o perfil |
@@ -223,6 +234,7 @@ painel-cargas/
 1. **Arquivo HTML** que lia a planilha da equipe
 2. **Aplicativo instalável (PWA)** no GitHub Pages, funcionando offline
 3. **Site online** com Supabase e Netlify: login, perfis, tempo real, ocorrências, histórico, cadastro e e-mails automáticos
+4. **v3**: controle de paletes PBR, R.F. informado, regra da terça, mensagens prontas, Teams, backup semanal, reforço de segurança e visual novo
 
 ---
 

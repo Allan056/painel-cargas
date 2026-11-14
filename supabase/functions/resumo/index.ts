@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import * as XLSX from "npm:xlsx@0.18.5";
 
 // Painel de Cargas · e-mails automáticos (resumo diário e relatório semanal de uso)
 const cors = {
@@ -41,6 +42,16 @@ function calendario(extras: string[]) {
   const menosUteis = (n: number, k: number) => { let x = n; while (k > 0) { x--; if (util(x)) k--; } return x; };
   return { util, menosUteis };
 }
+// prazos de uma carga: cronograma até e informar R.F.
+// agenda na terça (regra da terça ligada): R.F. na sexta anterior (dia útil anterior se for feriado) e cronograma até o sábado da produção
+function prazos(ag: number, regra: number, rfd: number, terca: boolean, cal: ReturnType<typeof calendario>) {
+  if (terca && new Date(ag * 864e5).getUTCDay() === 2) {
+    let rf = ag - 4; while (!cal.util(rf)) rf--;
+    return { lim: ag - 3, rf };
+  }
+  const lim = cal.menosUteis(ag, regra);
+  return { lim, rf: cal.menosUteis(lim, rfd) };
+}
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 const ST: Record<number, string> = { 1: "Aguardando cronograma", 2: "Próxima a produzir", 3: "Em produção", 4: "Produzida", 5: "Expedida", 6: "Entregue", 0: "Cancelada" };
 
@@ -58,24 +69,25 @@ const rodape = (o: string) => `<p style="color:#5d6b78;font-size:12px">E-mail au
 
 // deno-lint-ignore no-explicit-any
 async function montarDiario(db: any, dia: string) {
+  const pal = await saldoPBR(db, dia).catch(() => null);
   const [{ data: cargas, error: e1 }, { data: cfgRows }, { data: ocs }] = await Promise.all([
-    db.from("cargas").select("carga,envio,galpao,loja,agenda,status,volume").is("arquivado_em", null),
+    db.from("cargas").select("carga,envio,galpao,loja,agenda,status,volume,rf_info").is("arquivado_em", null),
     db.from("cargas_config").select("chave,valor").eq("chave", "geral"),
     db.from("ocorrencias").select("dia,tipo,carga,envio,descricao,aberta_por_nome").eq("status", "aberta").order("dia"),
   ]);
   if (e1) throw e1;
-  const g = (cfgRows?.[0]?.valor ?? {}) as { regraDias?: number; rfDias?: number; feriadosExtras?: string[] };
-  const regra = Number(g.regraDias ?? 3), rfd = Number(g.rfDias ?? 1);
+  const g = (cfgRows?.[0]?.valor ?? {}) as { regraDias?: number; rfDias?: number; feriadosExtras?: string[]; regraTerca?: boolean };
+  const regra = Number(g.regraDias ?? 3), rfd = Number(g.rfDias ?? 1), terca = g.regraTerca !== false;
   const cal = calendario(g.feriadosExtras ?? []);
   const hoje = dayOf(dia)!;
-  type L = { carga: string; envio: string; galpao: string; loja: string; agenda: string | null; status: number; volume: number | null; lim?: number; rf?: number; exp?: number };
+  type L = { carga: string; envio: string; galpao: string; loja: string; agenda: string | null; status: number; volume: number | null; rf_info?: unknown; lim?: number; rf?: number; exp?: number };
   const ab: L[] = (cargas ?? []).filter((c: L) => c.status >= 1 && c.status <= 4 && c.agenda).map((c: L) => {
-    const ag = dayOf(c.agenda)!; const lim = cal.menosUteis(ag, regra); return { ...c, lim, rf: cal.menosUteis(lim, rfd), exp: ag - 1 };
+    const ag = dayOf(c.agenda)!; const p = prazos(ag, regra, rfd, terca, cal); return { ...c, lim: p.lim, rf: p.rf, exp: ag - 1 };
   });
-  const rfHoje = ab.filter((c) => c.status === 1 && c.rf === hoje && c.lim! > hoje);
+  const rfHoje = ab.filter((c) => c.status === 1 && !c.rf_info && c.rf === hoje && c.lim! >= hoje);
   const cronoHoje = ab.filter((c) => c.status === 1 && c.lim === hoje);
   const expHoje = ab.filter((c) => c.status >= 2 && c.exp === hoje);
-  const rfAtras = ab.filter((c) => c.status === 1 && c.rf! < hoje && c.lim! > hoje);
+  const rfAtras = ab.filter((c) => c.status === 1 && !c.rf_info && c.rf! < hoje && c.lim! >= hoje);
   const cronoAtras = ab.filter((c) => c.status === 1 && c.lim! < hoje);
   const expAtras = ab.filter((c) => c.status >= 2 && c.exp! < hoje);
   const semAgenda = (cargas ?? []).filter((c: L) => c.status >= 1 && c.status <= 4 && !c.agenda);
@@ -93,6 +105,7 @@ async function montarDiario(db: any, dia: string) {
     ${kpi("Expedir hoje", String(expHoje.length), expHoje.length ? "#1d5fa8" : "#17212b")}
     ${kpi("Atrasadas", String(atrasadas), atrasadas ? "#c62828" : "#17212b")}
   </tr></table>
+  ${pal ? `<p style="margin:10px 0 0;font-size:14px;padding:10px 12px;border-radius:8px;background:${pal.nivel === "limite" ? "#fbe3e3" : pal.nivel === "aviso" ? "#fdf4dd" : "#f3f5f7"}"><b>Saldo de paletes PBR a devolver: ${pal.saldo} de ${pal.limite}</b>${pal.nivel === "limite" ? " · <b style=\"color:#c62828\">limite atingido: pedir o retorno dos paletes</b>" : pal.nivel === "aviso" ? " · perto do limite: programar o pedido de retorno" : ""}${pal.proj > pal.saldo ? ` · com as cargas já agendadas chega a ${pal.proj}` : ""}</p>` : ""}
   ${secao("Informar R.F. hoje", rfHoje.length)}${tabela(cab, lin(rfHoje))}
   ${secao("Entrar no cronograma hoje", cronoHoje.length)}${tabela(cab, lin(cronoHoje))}
   ${secao("Expedir hoje", expHoje.length)}${tabela(cab, lin(expHoje))}
@@ -106,7 +119,16 @@ async function montarDiario(db: any, dia: string) {
   ${rodape("E-mails automáticos")}
 </div>`;
   const assunto = `Cargas ${brA(dia)} · R.F. ${rfHoje.length} · cronograma ${cronoHoje.length} · expedir ${expHoje.length} · atrasadas ${atrasadas}`;
-  return { html, assunto };
+  const nomes = (l: L[]) => l.length ? ord(l).map((c) => c.carga + (c.galpao ? " (" + c.galpao + ")" : "")).join(", ") : "nenhuma";
+  const teams = [
+    `**Informar R.F. hoje (${rfHoje.length}):** ${nomes(rfHoje)}`,
+    `**Entrar no cronograma hoje (${cronoHoje.length}):** ${nomes(cronoHoje)}`,
+    `**Expedir hoje (${expHoje.length}):** ${nomes(expHoje)}`,
+    `**Atrasadas (${atrasadas}):** ${nomes([...cronoAtras, ...rfAtras, ...expAtras])}`,
+    `**Ocorrências abertas:** ${(ocs ?? []).length}`,
+    ...(pal ? [`**Saldo de PBR a devolver:** ${pal.saldo} de ${pal.limite}${pal.nivel === "limite" ? " · limite atingido, pedir o retorno" : pal.nivel === "aviso" ? " · perto do limite" : ""}`] : []),
+  ];
+  return { html, assunto, teams };
 }
 
 // ---------- relatório semanal de uso ----------
@@ -176,17 +198,105 @@ async function montarSemanal(db: any, dia: string) {
   return { html, assunto };
 }
 
-async function enviar(destinos: string[], assunto: string, html: string) {
+// ---------- paletes PBR: saldo a devolver ----------
+// envios da planilha (até a data de corte) + PBR das cargas do painel com agenda a partir do corte (até hoje, canceladas não contam) − retornos
+// deno-lint-ignore no-explicit-any
+async function saldoPBR(db: any, dia: string) {
+  const { data: c } = await db.from("cargas_config").select("valor").eq("chave", "paletes").maybeSingle();
+  const cfg = (c?.valor ?? {}) as { limite?: number; aviso?: number; corte?: string; destinatarios?: string[]; alertaEmail?: boolean; alertaTeams?: boolean };
+  const corte = String(cfg.corte ?? "2026-11-08"), limite = Number(cfg.limite ?? 200), aviso = Number(cfg.aviso ?? 180);
+  const [{ data: mov, error: e1 }, { data: cg, error: e2 }] = await Promise.all([
+    db.from("paletes_mov").select("tipo,dia,pbr,chep").order("dia"),
+    db.from("cargas").select("carga,agenda,pbr,status").gte("agenda", corte),
+  ]);
+  if (e1) throw e1; if (e2) throw e2;
+  let saldo = 0, proj = 0, ultRet: string | null = null, ultQ = 0;
+  for (const m of mov ?? []) {
+    if (m.tipo === "envio") { if (m.dia <= dia) saldo += m.pbr; proj += m.pbr; }
+    else { saldo -= m.pbr; proj -= m.pbr; if (m.pbr > 0 && (!ultRet || m.dia > ultRet)) { ultRet = m.dia; ultQ = 0; } if (m.dia === ultRet) ultQ += m.pbr; }
+  }
+  for (const x of cg ?? []) { if (x.status === 0 || !x.pbr) continue; if (x.agenda <= dia) saldo += x.pbr; proj += x.pbr; }
+  const nivel = saldo >= limite ? "limite" : saldo >= aviso ? "aviso" : "";
+  return { saldo, proj, limite, aviso, nivel, ultRet, ultQ, cfg };
+}
+
+// ---------- Microsoft Teams (Workflows: "Post to a channel when a webhook request is received") ----------
+const teamsOk = (u: string) => { try { const x = new URL(u); return x.protocol === "https:" && /(\.logic\.azure\.com|\.powerplatform\.com|\.powerautomate\.com|\.office\.com|\.webhook\.office\.com)$/i.test(x.hostname); } catch { return false; } };
+async function postTeams(url: string, titulo: string, linhas: string[], cor = "Default") {
+  const card = {
+    type: "message",
+    attachments: [{
+      contentType: "application/vnd.microsoft.card.adaptive", contentUrl: null,
+      content: {
+        $schema: "http://adaptivecards.io/schemas/adaptive-card.json", type: "AdaptiveCard", version: "1.4",
+        body: [{ type: "TextBlock", text: titulo, weight: "Bolder", size: "Medium", wrap: true, color: cor },
+          ...linhas.map((t) => ({ type: "TextBlock", text: t, wrap: true, spacing: "Small" }))],
+        actions: [{ type: "Action.OpenUrl", title: "Abrir o Painel de Cargas", url: SITE }],
+      },
+    }],
+  };
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(card) });
+  if (!r.ok && r.status !== 202) { const t = await r.text(); console.error("teams", r.status, t); throw new Error("Teams respondeu " + r.status); }
+}
+
+// ---------- backup semanal da base (Excel anexado) ----------
+// deno-lint-ignore no-explicit-any
+async function backupXlsx(db: any, dia: string) {
+  const [{ data: cg }, { data: mov }, { data: ocs }] = await Promise.all([
+    db.from("cargas").select("envio,carga,galpao,loja,rot,agenda,status,volume,pbr,chep,obs,rf_info,arquivado_em,atualizado_em").order("agenda"),
+    db.from("paletes_mov").select("tipo,dia,pbr,chep,carga,envio,origem,obs,por_nome,criado_em").order("dia"),
+    db.from("ocorrencias").select("dia,tipo,carga,envio,descricao,status,solucao,aberta_por_nome,resolvida_por_nome").order("dia"),
+  ]);
+  const d = (s: string | null) => s ? brA(s) : "";
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.aoa_to_sheet([["#ENVIO", "CARGA", "GALPÃO", "LOJA DESTINO", "DATA ROTEIRIZAÇÃO", "DATA AGENDA", "STATUS", "PALETES", "PALETES PBR", "PALETES CHEP", "OBSERVAÇÃO", "R.F. INFORMADO", "ARQUIVADA"]]
+    // deno-lint-ignore no-explicit-any
+    .concat((cg ?? []).map((c: any) => [c.envio, c.carga, c.galpao, c.loja, d(c.rot), d(c.agenda), (ST[c.status] ?? "").toUpperCase(), c.volume ?? "", c.pbr ?? "", c.chep ?? "", c.obs, c.rf_info?.em ? d(String(c.rf_info.em).slice(0, 10)) : "", c.arquivado_em ? "sim" : ""])));
+  ws1["!cols"] = [12, 12, 9, 12, 16, 12, 22, 9, 11, 11, 30, 14, 10].map((w) => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws1, "BASE");
+  // deno-lint-ignore no-explicit-any
+  const ws2 = XLSX.utils.aoa_to_sheet([["TIPO", "DATA", "PBR", "CHEP", "CARGA", "ENVIO", "ORIGEM", "OBSERVAÇÃO", "QUEM"]].concat((mov ?? []).map((m: any) => [m.tipo, d(m.dia), m.pbr, m.chep, m.carga, m.envio, m.origem, m.obs, m.por_nome ?? ""])));
+  XLSX.utils.book_append_sheet(wb, ws2, "PALETES");
+  // deno-lint-ignore no-explicit-any
+  const ws3 = XLSX.utils.aoa_to_sheet([["DIA", "TIPO", "CARGA", "ENVIO", "DESCRIÇÃO", "STATUS", "SOLUÇÃO", "ABERTA POR", "RESOLVIDA POR"]].concat((ocs ?? []).map((o: any) => [d(o.dia), o.tipo, o.carga, o.envio, o.descricao, o.status, o.solucao, o.aberta_por_nome ?? "", o.resolvida_por_nome ?? ""])));
+  XLSX.utils.book_append_sheet(wb, ws3, "OCORRENCIAS");
+  return { name: `Backup_Painel_Cargas_${brA(dia).replaceAll("/", "-")}.xlsx`, content: XLSX.write(wb, { type: "base64", bookType: "xlsx" }) as string, n: (cg ?? []).length };
+}
+
+async function enviar(destinos: string[], assunto: string, html: string, anexo?: { name: string; content: string }) {
   const KEY = Deno.env.get("BREVO_API_KEY"), REM = Deno.env.get("BREVO_REMETENTE");
   if (!KEY || !REM) throw new Error("Envio de e-mail não configurado (Brevo)");
+  // deno-lint-ignore no-explicit-any
+  const corpo: any = { sender: { email: REM, name: "Painel de Cargas" }, to: destinos.map((email) => ({ email })), subject: assunto, htmlContent: html };
+  if (anexo) corpo.attachment = [anexo];
   const r = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: { "api-key": KEY, "Content-Type": "application/json", accept: "application/json" },
-    body: JSON.stringify({ sender: { email: REM, name: "Painel de Cargas" }, to: destinos.map((email) => ({ email })), subject: assunto, htmlContent: html }),
+    body: JSON.stringify(corpo),
   });
   if (!r.ok) { const t = await r.text(); console.error("brevo", r.status, t); throw new Error("Falha no envio (" + r.status + ")"); }
 }
-const validos = (l: unknown) => [...new Set((Array.isArray(l) ? l : []).map((x) => String(x).trim().toLowerCase()).filter((x) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(x)))].slice(0, 20);
+const validos = (l: unknown) => [...new Set((Array.isArray(l) ? l : []).map((x) => String(x).trim().toLowerCase()).filter((x) => /^[^@\s]+@[^@\s.]+(\.[^@\s.]+)*\.[a-z]{2,}$/i.test(x)))].slice(0, 20);
+
+// deno-lint-ignore no-explicit-any
+function emailPaletes(p: any, dia: string) {
+  const cor = p.nivel === "limite" ? "#c62828" : "#c28a0c";
+  const pct = Math.min(100, Math.round(p.saldo / p.limite * 100));
+  const html = `<div style="font-family:Arial,sans-serif;color:#17212b;max-width:620px">
+  <h2 style="margin:0 0 6px;color:${cor}">${p.nivel === "limite" ? "Limite de paletes PBR atingido" : "Saldo de paletes PBR perto do limite"}</h2>
+  <p style="margin:0 0 14px;color:#5d6b78">Painel de Cargas · ${brA(dia)}</p>
+  <p style="font-size:28px;font-weight:bold;margin:0">${p.saldo} <span style="font-size:16px;color:#5d6b78">de ${p.limite} PBR a devolver</span></p>
+  <div style="height:10px;background:#e1e6eb;border-radius:5px;margin:8px 0 14px"><div style="height:10px;width:${pct}%;background:${cor};border-radius:5px"></div></div>
+  <p style="font-size:14px">${p.nivel === "limite" ? "Chegou a hora de <b>pedir o retorno dos paletes PBR</b> ao Mercado Livre." : `Faltam <b>${Math.max(0, p.limite - p.saldo)} PBR</b> para o limite. Vale programar o pedido de retorno.`}</p>
+  ${p.proj > p.saldo ? `<p style="font-size:14px">Com as cargas já agendadas, o saldo chega a <b>${p.proj}</b>.</p>` : ""}
+  <p style="font-size:14px;color:#5d6b78">Último retorno: ${p.ultRet ? brA(p.ultRet) + " (" + p.ultQ + " PBR)" : "nenhum registrado"}. Depois que os paletes voltarem, registre o retorno na aba Paletes.</p>
+  ${botao("Abrir o Painel de Cargas")}
+  <p style="color:#5d6b78;font-size:12px">Alerta automático. O Administrador Master ajusta o limite, o aviso e quem recebe na aba Paletes.</p></div>`;
+  const assunto = `${p.nivel === "limite" ? "LIMITE ATINGIDO" : "Atenção"} · saldo de PBR ${p.saldo} de ${p.limite}`;
+  const teams = [`**${p.saldo} de ${p.limite} PBR a devolver** (${pct}%)`, p.nivel === "limite" ? "Pedir o retorno dos paletes PBR ao Mercado Livre." : `Faltam ${Math.max(0, p.limite - p.saldo)} PBR para o limite.`,
+    ...(p.proj > p.saldo ? [`Com as cargas já agendadas, o saldo chega a ${p.proj}.`] : []), `Último retorno: ${p.ultRet ? brA(p.ultRet) + " (" + p.ultQ + " PBR)" : "nenhum"}`];
+  return { html, assunto, teams, titulo: p.nivel === "limite" ? "⚠ Limite de paletes PBR atingido" : "Saldo de paletes PBR perto do limite", cor: p.nivel === "limite" ? "Attention" : "Warning" };
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -196,33 +306,89 @@ Deno.serve(async (req) => {
   const db = createClient(URL_, SERVICE, { auth: { persistSession: false, autoRefreshToken: false } });
   const seg = async (k: string) => (await db.from("segredos").select("valor").eq("chave", k).maybeSingle()).data?.valor ?? null;
   const marcar = (k: string, v: string) => db.from("segredos").upsert({ chave: k, valor: v, atualizado_em: new Date().toISOString() });
-  const cfg = ((await db.from("cargas_config").select("valor").eq("chave", "resumo").maybeSingle()).data?.valor ?? {}) as Record<string, { destinatarios?: string[] }>;
+  // deno-lint-ignore no-explicit-any
+  const cfg = ((await db.from("cargas_config").select("valor").eq("chave", "resumo").maybeSingle()).data?.valor ?? {}) as Record<string, any>;
   const dia = hojeSP();
+  const teamsUrl = async () => { const u = await seg("teams_webhook"); return u && teamsOk(u) ? u : null; };
+  const souMaster = async () => {
+    const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+    const { data: quem } = await db.auth.getUser(token);
+    if (!quem?.user) return null;
+    const { data: p } = await db.from("perfis").select("perfil").eq("id", quem.user.id).maybeSingle();
+    return p?.perfil === "master" ? quem.user : null;
+  };
   try {
     const acao = String(body.acao ?? "");
-    if (acao === "diario" || acao === "semanal") {
+    if (acao === "diario" || acao === "semanal" || acao === "paletes") {
       const chave = await seg("cron_key");
       if (!chave || req.headers.get("x-cron-key") !== chave) return j({ erro: "Não autorizado" }, 401);
       if ((await seg(acao + "_ultimo")) === dia) return j({ ok: true, enviado: false, motivo: "já enviado hoje" });
+      if (acao === "paletes") {
+        const p = await saldoPBR(db, dia);
+        const rank = (n: string | null) => n === "limite" ? 2 : n === "aviso" ? 1 : 0;
+        const antes = await seg("paletes_nivel");
+        let enviado = false;
+        if (rank(p.nivel) > rank(antes)) {
+          const m = emailPaletes(p, dia);
+          const dest = validos(p.cfg.destinatarios);
+          if (p.cfg.alertaEmail !== false && dest.length) { await enviar(dest, m.assunto, m.html); enviado = true; }
+          const tu = await teamsUrl();
+          if (tu && p.cfg.alertaTeams !== false && cfg.teams?.paletes !== false) { await postTeams(tu, m.titulo, m.teams, m.cor); enviado = true; }
+        }
+        await marcar("paletes_nivel", p.nivel);
+        await marcar("paletes_ultimo", dia);
+        return j({ ok: true, saldo: p.saldo, nivel: p.nivel, enviado });
+      }
       const destinos = validos(cfg[acao]?.destinatarios);
-      if (!destinos.length) { await marcar(acao + "_ultimo", dia); return j({ ok: true, enviado: false, motivo: "sem destinatários" }); }
-      const r = acao === "diario" ? await montarDiario(db, dia) : await montarSemanal(db, dia);
-      await enviar(destinos, r.assunto, r.html);
+      const tu = acao === "diario" && cfg.teams?.diario !== false ? await teamsUrl() : null;
+      if (!destinos.length && !tu) { await marcar(acao + "_ultimo", dia); return j({ ok: true, enviado: false, motivo: "sem destinatários" }); }
+      if (acao === "diario") {
+        const r = await montarDiario(db, dia);
+        if (destinos.length) await enviar(destinos, r.assunto, r.html);
+        if (tu) await postTeams(tu, "Resumo do dia · " + brA(dia), r.teams).catch((e) => console.error(e));
+      } else {
+        const r = await montarSemanal(db, dia);
+        const bk = cfg.semanal?.backup !== false ? await backupXlsx(db, dia).catch((e) => { console.error("backup", e); return null; }) : null;
+        await enviar(destinos, r.assunto + (bk ? " · backup da base anexado" : ""), r.html.replace("</div>", (bk ? `<p style="font-size:14px">Em anexo: <b>${bk.name}</b>, backup da base com ${bk.n} cargas (inclui as arquivadas), movimentos de paletes e ocorrências. Guarde numa pasta segura.</p>` : "") + "</div>"), bk ?? undefined);
+      }
       await marcar(acao + "_ultimo", dia);
       return j({ ok: true, enviado: true, para: destinos.length });
     }
     if (acao === "teste") {
-      const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-      const { data: quem } = await db.auth.getUser(token);
-      if (!quem?.user) return j({ erro: "Entre com seu usuário primeiro." }, 401);
-      const { data: p } = await db.from("perfis").select("perfil").eq("id", quem.user.id).maybeSingle();
-      if (!p || p.perfil !== "master") return j({ erro: "Só o Administrador Master pode enviar o teste." }, 403);
-      const tipo = body.tipo === "semanal" ? "semanal" : "diario";
+      const quem = await souMaster();
+      if (!quem) return j({ erro: "Só o Administrador Master pode enviar o teste." }, 403);
+      const tipo = body.tipo === "semanal" ? "semanal" : body.tipo === "paletes" ? "paletes" : "diario";
+      if (tipo === "paletes") {
+        const p = await saldoPBR(db, dia);
+        const m = emailPaletes({ ...p, nivel: p.nivel || "aviso" }, dia);
+        let destinos = validos(p.cfg.destinatarios); if (!destinos.length && quem.email) destinos = [quem.email];
+        await enviar(destinos, "[TESTE] " + m.assunto, m.html);
+        return j({ ok: true, para: destinos });
+      }
       let destinos = validos(cfg[tipo]?.destinatarios);
-      if (!destinos.length && quem.user.email) destinos = [quem.user.email];
-      const r = tipo === "diario" ? await montarDiario(db, dia) : await montarSemanal(db, dia);
-      await enviar(destinos, "[TESTE] " + r.assunto, r.html);
+      if (!destinos.length && quem.email) destinos = [quem.email];
+      if (tipo === "diario") { const r = await montarDiario(db, dia); await enviar(destinos, "[TESTE] " + r.assunto, r.html); }
+      else {
+        const r = await montarSemanal(db, dia);
+        const bk = cfg.semanal?.backup !== false ? await backupXlsx(db, dia) : null;
+        await enviar(destinos, "[TESTE] " + r.assunto, r.html, bk ?? undefined);
+      }
       return j({ ok: true, para: destinos });
+    }
+    if (acao === "teams_salvar") {
+      if (!(await souMaster())) return j({ erro: "Só o Administrador Master configura o Teams." }, 403);
+      const url = String(body.url ?? "").trim();
+      if (url && !teamsOk(url)) return j({ erro: "Esse endereço não parece um Workflow do Teams. Copie o endereço HTTP POST que o Teams mostra ao criar o fluxo." }, 400);
+      if (url) await marcar("teams_webhook", url); else await db.from("segredos").delete().eq("chave", "teams_webhook");
+      await db.from("cargas_config").update({ valor: { ...cfg, teamsConfigurado: !!url } }).eq("chave", "resumo");
+      return j({ ok: true, configurado: !!url });
+    }
+    if (acao === "teams_teste") {
+      if (!(await souMaster())) return j({ erro: "Só o Administrador Master configura o Teams." }, 403);
+      const tu = await teamsUrl(); if (!tu) return j({ erro: "Cole o endereço do Workflow do Teams primeiro." }, 400);
+      const r = await montarDiario(db, dia);
+      await postTeams(tu, "[TESTE] Resumo do dia · " + brA(dia), r.teams);
+      return j({ ok: true });
     }
     return j({ erro: "Ação inválida" }, 400);
   } catch (e) {
