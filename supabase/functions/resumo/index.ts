@@ -84,14 +84,16 @@ async function montarDiario(db: any, dia: string) {
   const ab: L[] = (cargas ?? []).filter((c: L) => c.status >= 1 && c.status <= 4 && c.agenda).map((c: L) => {
     const ag = dayOf(c.agenda)!; const p = prazos(ag, regra, rfd, terca, cal); return { ...c, lim: p.lim, rf: p.rf, exp: ag - 1 };
   });
-  const rfHoje = ab.filter((c) => c.status === 1 && !c.rf_info && c.rf === hoje && c.lim! >= hoje);
+  // R.F. não tem prazo: fica pendente até ser informado, em qualquer dia antes do cronograma
+  const rfOk = (c: L) => !!(c.rf_info && (c.rf_info as { em?: string }).em);
+  const rfPend = ab.filter((c) => c.status === 1 && !rfOk(c) && c.lim! >= hoje);
+  const rfDia = (c: L) => { const x = c.rf_info as { em?: string; dia?: string } | null; if (!x || !x.em) return "pendente"; if (x.dia) return "informado " + br(x.dia); const t = new Date(new Date(x.em).getTime() - 3 * 36e5); return "informado " + br(t.toISOString().slice(0, 10)); };
   const cronoHoje = ab.filter((c) => c.status === 1 && c.lim === hoje);
   const expHoje = ab.filter((c) => c.status >= 2 && c.exp === hoje);
-  const rfAtras = ab.filter((c) => c.status === 1 && !c.rf_info && c.rf! < hoje && c.lim! >= hoje);
   const cronoAtras = ab.filter((c) => c.status === 1 && c.lim! < hoje);
   const expAtras = ab.filter((c) => c.status >= 2 && c.exp! < hoje);
   const semAgenda = (cargas ?? []).filter((c: L) => c.status >= 1 && c.status <= 4 && !c.agenda);
-  const atrasadas = rfAtras.length + cronoAtras.length + expAtras.length;
+  const atrasadas = cronoAtras.length + expAtras.length;
   const ord = (l: L[]) => l.sort((a, b) => String(a.agenda).localeCompare(String(b.agenda)) || a.envio.localeCompare(b.envio));
   const lin = (l: L[], extra?: (c: L) => string) => ord(l).map((c) => [c.carga, c.envio || "—", c.galpao || "—", `${br(c.agenda)} (${WD[new Date(dayOf(c.agenda)! * 864e5).getUTCDay()]})`, ST[c.status] ?? "", c.volume == null ? "—" : String(c.volume), ...(extra ? [extra(c)] : [])]);
   const cab = ["Carga", "Envio", "Galpão", "Agenda", "Status", "Paletes"];
@@ -100,31 +102,30 @@ async function montarDiario(db: any, dia: string) {
   <h2 style="margin:0 0 2px">Resumo do dia · ${DOW[d.getUTCDay()]}, ${brA(dia)}</h2>
   <p style="margin:0 0 14px;color:#5d6b78">Painel de Cargas – Envios Mercado Livre</p>
   <table cellspacing="6" style="width:100%"><tr>
-    ${kpi("Informar R.F. hoje", String(rfHoje.length), rfHoje.length ? "#e0681f" : "#17212b")}
+    ${kpi("R.F. pendente", String(rfPend.length), "#17212b")}
     ${kpi("Entrar no cronograma", String(cronoHoje.length), cronoHoje.length ? "#e0681f" : "#17212b")}
     ${kpi("Expedir hoje", String(expHoje.length), expHoje.length ? "#1d5fa8" : "#17212b")}
     ${kpi("Atrasadas", String(atrasadas), atrasadas ? "#c62828" : "#17212b")}
   </tr></table>
   ${pal ? `<p style="margin:10px 0 0;font-size:14px;padding:10px 12px;border-radius:8px;background:${pal.nivel === "limite" ? "#fbe3e3" : pal.nivel === "aviso" ? "#fdf4dd" : "#f3f5f7"}"><b>Saldo de paletes PBR a devolver: ${pal.saldo} de ${pal.limite}</b>${pal.nivel === "limite" ? " · <b style=\"color:#c62828\">limite atingido: pedir o retorno dos paletes</b>" : pal.nivel === "aviso" ? " · perto do limite: programar o pedido de retorno" : ""}${pal.proj > pal.saldo ? ` · com as cargas já agendadas chega a ${pal.proj}` : ""}</p>` : ""}
-  ${secao("Informar R.F. hoje", rfHoje.length)}${tabela(cab, lin(rfHoje))}
-  ${secao("Entrar no cronograma hoje", cronoHoje.length)}${tabela(cab, lin(cronoHoje))}
+  ${secao("Entrar no cronograma hoje", cronoHoje.length)}${tabela([...cab, "R.F."], lin(cronoHoje, rfDia))}
+  ${secao("R.F. pendente", rfPend.length)}${tabela([...cab, "Cronograma até"], lin(rfPend, (c) => br(isoOf(c.lim!))))}
   ${secao("Expedir hoje", expHoje.length)}${tabela(cab, lin(expHoje))}
   <h2 style="margin:22px 0 4px;color:#c62828">Atrasadas (${atrasadas})</h2>
   ${secao("Fora do prazo do cronograma", cronoAtras.length, "#c62828")}${tabela([...cab, "Cronograma até"], lin(cronoAtras, (c) => br(isoOf(c.lim!))))}
-  ${secao("R.F. não informado", rfAtras.length, "#c62828")}${tabela([...cab, "Informar R.F."], lin(rfAtras, (c) => br(isoOf(c.rf!))))}
   ${secao("Expedição atrasada", expAtras.length, "#c62828")}${tabela([...cab, "Expedir em"], lin(expAtras, (c) => br(isoOf(c.exp!))))}
   ${semAgenda.length ? secao("Aguardando envio e agenda", semAgenda.length) + tabela(["Carga", "Galpão", "Status"], semAgenda.map((c: L) => [c.carga, c.galpao || "—", ST[c.status] ?? ""])) : ""}
   ${secao("Ocorrências abertas", (ocs ?? []).length)}${tabela(["Dia", "Tipo", "Carga", "Descrição", "Aberta por"], (ocs ?? []).map((o: { dia: string; tipo: string; carga: string; envio: string; descricao: string; aberta_por_nome: string }) => [br(o.dia), o.tipo, o.carga || o.envio || "—", o.descricao, o.aberta_por_nome || ""]))}
   ${botao("Abrir o Painel de Cargas")}
   ${rodape("E-mails automáticos")}
 </div>`;
-  const assunto = `Cargas ${brA(dia)} · R.F. ${rfHoje.length} · cronograma ${cronoHoje.length} · expedir ${expHoje.length} · atrasadas ${atrasadas}`;
+  const assunto = `Cargas ${brA(dia)} · R.F. pendente ${rfPend.length} · cronograma ${cronoHoje.length} · expedir ${expHoje.length} · atrasadas ${atrasadas}`;
   const nomes = (l: L[]) => l.length ? ord(l).map((c) => c.carga + (c.galpao ? " (" + c.galpao + ")" : "")).join(", ") : "nenhuma";
   const teams = [
-    `**Informar R.F. hoje (${rfHoje.length}):** ${nomes(rfHoje)}`,
-    `**Entrar no cronograma hoje (${cronoHoje.length}):** ${nomes(cronoHoje)}`,
+    `**Entrar no cronograma hoje (${cronoHoje.length}):** ${cronoHoje.length ? ord(cronoHoje).map((c) => c.carga + (c.galpao ? " (" + c.galpao + ")" : "") + " · R.F. " + rfDia(c)).join(", ") : "nenhuma"}`,
+    `**R.F. pendente (${rfPend.length}):** ${nomes(rfPend)}`,
     `**Expedir hoje (${expHoje.length}):** ${nomes(expHoje)}`,
-    `**Atrasadas (${atrasadas}):** ${nomes([...cronoAtras, ...rfAtras, ...expAtras])}`,
+    `**Atrasadas (${atrasadas}):** ${nomes([...cronoAtras, ...expAtras])}`,
     `**Ocorrências abertas:** ${(ocs ?? []).length}`,
     ...(pal ? [`**Saldo de PBR a devolver:** ${pal.saldo} de ${pal.limite}${pal.nivel === "limite" ? " · limite atingido, pedir o retorno" : pal.nivel === "aviso" ? " · perto do limite" : ""}`] : []),
   ];
@@ -251,7 +252,7 @@ async function backupXlsx(db: any, dia: string) {
   const wb = XLSX.utils.book_new();
   const ws1 = XLSX.utils.aoa_to_sheet([["#ENVIO", "CARGA", "GALPÃO", "LOJA DESTINO", "DATA ROTEIRIZAÇÃO", "DATA AGENDA", "STATUS", "PALETES", "PALETES PBR", "PALETES CHEP", "OBSERVAÇÃO", "R.F. INFORMADO", "ARQUIVADA"]]
     // deno-lint-ignore no-explicit-any
-    .concat((cg ?? []).map((c: any) => [c.envio, c.carga, c.galpao, c.loja, d(c.rot), d(c.agenda), (ST[c.status] ?? "").toUpperCase(), c.volume ?? "", c.pbr ?? "", c.chep ?? "", c.obs, c.rf_info?.em ? d(String(c.rf_info.em).slice(0, 10)) : "", c.arquivado_em ? "sim" : ""])));
+    .concat((cg ?? []).map((c: any) => [c.envio, c.carga, c.galpao, c.loja, d(c.rot), d(c.agenda), (ST[c.status] ?? "").toUpperCase(), c.volume ?? "", c.pbr ?? "", c.chep ?? "", c.obs, c.rf_info?.em ? d(c.rf_info.dia || new Date(new Date(c.rf_info.em).getTime() - 3 * 36e5).toISOString().slice(0, 10)) : "", c.arquivado_em ? "sim" : ""])));
   ws1["!cols"] = [12, 12, 9, 12, 16, 12, 22, 9, 11, 11, 30, 14, 10].map((w) => ({ wch: w }));
   XLSX.utils.book_append_sheet(wb, ws1, "BASE");
   // deno-lint-ignore no-explicit-any

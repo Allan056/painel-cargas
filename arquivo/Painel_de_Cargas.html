@@ -514,6 +514,9 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .adv.rfb{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 45%,transparent)}
 .card .r3{gap:6px;flex-wrap:wrap}
 .rfok{color:var(--ok);font-weight:700}
+.rfpend{color:var(--muted);font-weight:600}
+.cols>.col{min-width:0}.col .card{min-width:0}.col .card .r1{flex-wrap:wrap;row-gap:6px}.col .card .r1>span[style]{flex:1 0 auto !important}.col .card .r3{flex-wrap:wrap}
+.rfbox input.rfdia{width:auto;display:inline-block;padding:3px 8px;font-family:var(--mono);font-size:13px;margin:0 4px}
 .envp{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
 .envbar{flex:1;height:5px;border-radius:3px;background:var(--line-forte);overflow:hidden}
 .envbar i{display:block;height:100%;background:linear-gradient(90deg,var(--s3),var(--s4));border-radius:3px;box-shadow:0 0 8px var(--s4)}
@@ -785,13 +788,13 @@ function codTexto(s){ // null = em branco, undefined = não reconhecido
 /* ================= cálculo de cada carga ================= */
 function calc(id,d,hoje){
   const cod=typeof d.status==="number"?d.status:1, ag=dayOf(d.agenda);
-  /* agenda na terça (regra da terça): R.F. exatamente na sexta anterior (ou no dia útil anterior, se for feriado) e cronograma até o sábado da produção */
+  /* agenda na terça (regra da terça): cronograma até o sábado da produção. O R.F. não tem prazo: pode ser informado em qualquer dia antes do cronograma. */
   const terca=!!(cfg.regraTerca&&ag!=null&&new Date(ag*864e5).getUTCDay()===2);
-  let lim=null, rf=null;
-  if(ag!=null){ if(terca){lim=ag-3;rf=ag-4;while(!util(rf))rf--;} else {lim=menosUteis(ag,cfg.regraDias);rf=menosUteis(lim,cfg.rfDias);} }
+  let lim=null;
+  if(ag!=null){ lim=terca?ag-3:menosUteis(ag,cfg.regraDias); }
   const duLim=lim==null?null:uteisEntre(hoje,lim)+(lim>hoje&&!util(lim)?1:0);
-  const duRf=rf==null?null:uteisEntre(hoje,rf);
   const rfInfo=d.rfInfo&&d.rfInfo.em?d.rfInfo:null;
+  const rfDia=rfDiaDe(rfInfo); /* dia em que o R.F. foi informado */
   const duAg=ag==null?null:uteisEntre(hoje,ag);
   const ex=ag==null?null:ag-1; /* expedição: véspera da agenda (entrega na madrugada do dia agendado) */
   let alerta="No prazo",nivel="ok",acao="";
@@ -803,12 +806,9 @@ function calc(id,d,hoje){
   else if(cod===1){
     acao=rfInfo?"Confirmar a inclusão no cronograma":"Informar R.F. e incluir no cronograma";
     if(hoje>lim){alerta="Fora do prazo do cronograma";nivel="crit";}
-    else if(hoje===lim){alerta="Incluir hoje";nivel="high";}
+    else if(hoje===lim){alerta="Incluir hoje";nivel="high";if(!rfInfo)acao="Informar R.F. e incluir hoje";}
     else if(rfInfo){alerta="R.F. informado";nivel="ok";}
-    else if(hoje===rf){alerta="Informar R.F. hoje";nivel="high";acao="Informar R.F. hoje";}
-    else if(hoje>rf){alerta="R.F. atrasado";nivel="high";acao="Informar R.F. agora";}
-    else if(terca){alerta=new Date(rf*864e5).getUTCDay()===5?"R.F. só na sexta":"R.F. só em "+br(isoOf(rf));nivel="ok";acao="Informar R.F. em "+br(isoOf(rf))+" ("+wd(rf)+"), não antes";}
-    else if(duRf<=cfg.atencaoDias){alerta="Atenção";nivel="warn";}
+    else if(duLim<=cfg.atencaoDias){alerta="Atenção";nivel="warn";}
   }
   else if(hoje===ex){alerta="Expedir hoje";nivel="high";acao=cod===4?"Expedir hoje":"Finalizar produção e expedir hoje";}
   else if(cod<=3&&uteisEntre(hoje,ex)<=1){alerta="Risco de atraso";nivel="high";acao=cod===2?"Iniciar produção":"Finalizar produção";}
@@ -819,8 +819,12 @@ function calc(id,d,hoje){
   return {id,envio:String(d.envio||""),carga:String(d.carga||""),galpao:String(d.galpao||""),loja:String(d.loja==null?"":d.loja),rot:d.rot||"",agenda:d.agenda||"",volume:(typeof d.volume==="number"?d.volume:null),obs:d.obs||"",
     pbr:(typeof d.pbr==="number"?d.pbr:null),chep:(typeof d.chep==="number"?d.chep:null),rfInfo,terca,
     cod,hist,atualizadoEm:d.atualizadoEm||"",atualizadoPor:d.atualizadoPor||null,
-    lim:lim==null?"":isoOf(lim),duLim,exp:ex==null?"":isoOf(ex),rf:rf==null?"":isoOf(rf),duRf,duAg,alerta,nivel,acao,key:rank*1e6+(ref==null?99999:ref)};
+    lim:lim==null?"":isoOf(lim),duLim,exp:ex==null?"":isoOf(ex),rf:rfDia,duAg,alerta,nivel,acao,key:rank*1e6+(ref==null?99999:ref)};
 }
+/* R.F.: dia em que foi informado (o dia escolhido na carga ou o dia em que marcou) */
+function rfDiaDe(x){ if(!x||!x.em) return ""; if(x.dia&&/^\d{4}-\d{2}-\d{2}$/.test(x.dia)) return x.dia; const d=new Date(x.em); return isNaN(d)?String(x.em).slice(0,10):iso(d.getFullYear(),d.getMonth()+1,d.getDate()); }
+const rfCel=(r)=>r.rfInfo?`${br(r.rf)}<div class="small"><span class="rfok">informado ✓</span></div>`:r.cod===1&&r.agenda?`<span class="small rfpend">pendente</span>`:"—";
+const rfLin=(r)=>r.rfInfo?`<b>${br(r.rf)}</b> ${wdS(r.rf)} · <span class="rfok">informado ✓</span>`:`<span class="rfpend">pendente</span>`;
 const prazoTxt=(du)=>du==null?"—":du<0?`${-du} d.u. atrasado`:du===0?"hoje":`em ${du} d.u.`;
 const aberta=(r)=>r.cod>=1&&r.cod<=5;
 const cv=(c)=>`--c:var(${ST[c].c});--cb:var(${ST[c].c}-bg)`;
@@ -907,7 +911,7 @@ function render(){
         <button class="btn ghost" id="resumo">Copiar resumo do dia</button>
         <button class="btn ${modoLocal&&sujo?"":"ghost"}" id="baixar" ${modoLocal&&sujo?'title="Há mudanças feitas no painel que ainda não estão na planilha"':""}>Baixar base${modoLocal&&sujo?" ●":""}</button>
         ${docs.size&&!retrato&&!modoLocal?`<button class="btn ghost" id="exphtml" title="Arquivo com as cargas de agora, para abrir em qualquer navegador">Exportar HTML</button>`:""}
-        ${canAdmin?`<button class="btn ghost" id="cfg" aria-label="Regras do painel">Regras · ${cfg.regraDias} d.u. · R.F. ${cfg.rfDias}</button>`:""}
+        ${canAdmin?`<button class="btn ghost" id="cfg" aria-label="Regras do painel">Regras · ${cfg.regraDias} d.u.</button>`:""}
         ${canWrite?`<button class="btn" id="btnArq">Carregar base</button>`:`<span class="ro" title="${esc(readOnlyReason)}">${online?"Visualizador · só leitura":"Somente leitura"}</span>`}
       </div></div>`:""}
       ${modoLocal&&sujo&&docs.size?`<div class="notice"><b>Há mudanças feitas no painel que ainda não estão na planilha.</b> Clique em <b>Baixar base</b> e salve o arquivo na pasta da equipe para que todos vejam.</div>`:""}
@@ -961,12 +965,12 @@ function vAjuda(){
       "<b>Entregue</b> e <b>Cancelada</b>: encerradas, saem da fila."])}
     ${sec("Prazos (calculados sozinhos)",[
       `<b>Cronograma até</b>: a carga precisa entrar no cronograma ${pl(cfg.regraDias,"dia útil","dias úteis")} antes da agenda.`,
-      `<b>Informar R.F.</b>: ${pl(cfg.rfDias,"dia útil","dias úteis")} antes do cronograma.`,
-      cfg.regraTerca?"<b>Agenda na terça</b>: o R.F. é informado <b>na sexta anterior</b>, nunca antes (se a sexta for feriado, no dia útil anterior), e a carga entra no cronograma até o <b>sábado</b>. Assim a produção acontece no fim de semana e a expedição na segunda. Até a sexta, a carga mostra “R.F. só na sexta”.":"A regra da terça está desligada: agendas de terça seguem a regra normal.",
-      "Depois de informar, marque <b>✓ R.F. informado</b> na carga (ou várias de uma vez pela barra de seleção). O alerta some e fica registrado quem marcou e quando.",
+      "<b>R.F.</b>: não tem prazo próprio. Informe em qualquer dia antes do cronograma; até lá a carga mostra <b>R.F. pendente</b>.",
+      cfg.regraTerca?"<b>Agenda na terça</b>: a carga entra no cronograma até o <b>sábado</b>, para produzir no fim de semana e expedir na segunda.":"A regra da terça está desligada: agendas de terça seguem a regra normal de dias úteis.",
+      "Depois de informar, marque <b>✓ R.F. informado</b> na carga (ou várias de uma vez pela barra de seleção). A coluna passa a mostrar o dia em que você marcou. Se informou em outro dia, troque a data dentro da carga.",
       "<b>Expedição</b>: na véspera da agenda, porque a entrega no Mercado Livre é na madrugada do dia agendado.",
       "Dias úteis não contam sábados, domingos, feriados nacionais e os feriados locais cadastrados.",
-      "<b>Alertas</b>: Atenção (faltam poucos dias), Informar R.F. hoje, Incluir hoje, Expedir hoje, Risco de atraso e as atrasadas em vermelho."])}
+      "<b>Alertas</b>: Atenção (faltam poucos dias para o cronograma), Incluir hoje (com o R.F. ainda pendente, a ação é Informar R.F. e incluir hoje), Expedir hoje, Risco de atraso e as atrasadas em vermelho."])}
     ${sec("Mudar uma carga",[
       "Clique no <b>número da carga</b> para abrir os detalhes: mude o status, informe envio, agenda, galpão, loja, paletes e observação.",
       "Para várias cargas de uma vez, marque as caixinhas e use a barra que aparece embaixo (mudar status, <b>Agendar</b> envio e agenda, exportar para Excel).",
@@ -1008,7 +1012,7 @@ function vAjuda(){
       "<b>Backup semanal</b>: o relatório semanal leva a base inteira em Excel anexada (cargas, inclusive arquivadas, paletes e ocorrências).",
       "<b>Aba Paletes → Configurar</b>: limite, aviso e quem recebe o alerta.",
       "<b>Relatório semanal com créditos do Netlify</b>: crie um token em app.netlify.com → User settings → Applications → Personal access tokens e cadastre no Supabase como <b>NETLIFY_TOKEN</b> (Edge Functions → Secrets).",
-      "<b>Regras</b>: dias úteis antes da agenda, R.F. e feriados locais.",
+      "<b>Regras</b>: dias úteis antes da agenda, regra da terça e feriados locais.",
       "<b>Código do time</b>: troque quando alguém sair do time ou se o código vazar. Quem já tem conta continua entrando."]):""}
     ${on?sec("Arquivamento automático",[
       "Cargas <b>Expedidas, Entregues ou Canceladas</b> saem do painel 60 dias depois da agenda e ficam guardadas no banco.",
@@ -1034,7 +1038,7 @@ function kpis(){
   const h0=hojeN(), exp7=[0,1,2,3,4,5,6].map(i=>ab.filter(r=>r.cod>=2&&r.cod<=4&&dayOf(r.exp)===h0+i).length), exp7d=[0,1,2,3,4,5,6].map(i=>wd(h0+i)+" "+br(isoOf(h0+i))+": "+exp7[i]+" a expedir");
   return {prod,prox,n1:ab.filter(r=>r.cod===1).length,exp7,exp7d,exp:exp.length,expPal:exp.reduce((a,r)=>a+(r.volume||0),0),crit:crit.length,critTxt:Object.entries(cc).map(([t,n])=>n+" "+t).join(" · "),
     pId:first?first.id:"",pTxt:first?`<span class="mono">${esc(first.carga)}</span>${grupo.length>1?` <small>+${grupo.length-1}</small>`:""}`:"—",
-    pSub:first?(first.cod===1?`R.F. ${br(first.rf)} · cronograma ${br(first.lim)}`:`${ST[first.cod].nome} · agenda ${br(first.agenda)}`):"nenhuma carga a produzir"};
+    pSub:first?(first.cod===1?`R.F. ${first.rfInfo?br(first.rf)+" ✓":"pendente"} · cronograma ${br(first.lim)}`:`${ST[first.cod].nome} · agenda ${br(first.agenda)}`):"nenhuma carga a produzir"};
 }
 function horaAgora(){const d=new Date();return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}
 setInterval(()=>{const h=$("#relogio");if(h)h.textContent=horaAgora();const vv=$("#vivo");if(vv&&online){const ok=online.aoVivo();vv.textContent=ok?"AO VIVO":"CONECTANDO…";vv.classList.toggle("off",!ok);}},15000);
@@ -1047,7 +1051,7 @@ let visao="cartoes"; try{visao=localStorage.getItem("painel-visao")||"cartoes";}
 function cardCarga(r){
   const c=r.cod;
   const linha=!r.agenda?`<span class="k">Sem envio e agenda · agende no portal ML e informe aqui</span>`
-    :c===1?`<span><span class="k">R.F.</span> <b>${br(r.rf)}</b> ${wdS(r.rf)} · ${r.rfInfo?'<span class="rfok">informado ✓</span>':prazoTxt(r.duRf)}</span><span><span class="k">Cronograma até</span> <b>${br(r.lim)}</b> ${wdS(r.lim)}</span><span><span class="k">Agenda</span> <b>${br(r.agenda)}</b> ${wdS(r.agenda)}</span>`
+    :c===1?`<span><span class="k">R.F.</span> ${rfLin(r)}</span><span><span class="k">Cronograma até</span> <b>${br(r.lim)}</b> ${wdS(r.lim)}</span><span><span class="k">Agenda</span> <b>${br(r.agenda)}</b> ${wdS(r.agenda)}</span>`
     :c>=2&&c<=4?`<span><span class="k">Expedição</span> <b>${br(r.exp)}</b> ${wdS(r.exp)}</span><span><span class="k">Agenda</span> <b>${br(r.agenda)}</b> ${wdS(r.agenda)} · ${prazoTxt(r.duAg)}</span>`
     :`<span><span class="k">Agenda</span> <b>${br(r.agenda)}</b> ${wdS(r.agenda)}</span>`;
   return `<article class="card ${sel.has(r.id)?"on":""} ${aberta(r)?"":"fech"}" style="${av(r)};${cv(c)}">
@@ -1080,9 +1084,9 @@ function vPainel(){
   const hc=first?(first.nivel==="ok"?"--accent":AL[first.nivel]):"--ok";
   const hero=first?`<div class="hero" style="--hc:var(${hc})">
       <div class="hh"><span class="label">Próxima${grupo.length>1?"s":""} carga${grupo.length>1?"s":""} para produção</span>
-      <span class="d">Informar R.F. ${br(first.rf)} (${wdS(first.rf)}) · Cronograma até ${br(first.lim)} (${wdS(first.lim)}) · Expedição ${br(first.exp)} (${wdS(first.exp)}) · Agenda ${br(first.agenda)} (${wdS(first.agenda)}) · ${pl(grupo.length,"carga")}${sumVol(grupo)}</span></div>
-      <div class="hbox"><table class="ht"><thead><tr><th></th><th>Carga</th><th>Envio</th><th>Galpão</th><th>Loja</th><th>Status</th><th>Informar R.F.</th><th>Cronograma até</th><th>Agenda ML</th></tr></thead><tbody>
-      ${grupo.map(r=>`<tr><td style="width:16px">${ckb(r.id)}</td><td class="big">${cgBtn(r)}</td><td class="mono">${esc(r.envio)||"—"}</td><td>${esc(r.galpao)||"—"}</td><td>${esc(r.loja)||"—"}</td><td>${ST[r.cod].nome}</td><td class="mono">${br(r.rf)}${r.cod===1?" · "+(r.rfInfo?'<span class="rfok">informado ✓</span>':prazoTxt(r.duRf)):""}</td><td class="mono">${br(r.lim)} · ${prazoTxt(r.duLim)}</td><td class="mono">${br(r.agenda)} · ${prazoTxt(r.duAg)}</td></tr>`).join("")}
+      <span class="d">R.F. ${first.rfInfo?"informado em "+br(first.rf):"pendente"} · Cronograma até ${br(first.lim)} (${wdS(first.lim)}) · Expedição ${br(first.exp)} (${wdS(first.exp)}) · Agenda ${br(first.agenda)} (${wdS(first.agenda)}) · ${pl(grupo.length,"carga")}${sumVol(grupo)}</span></div>
+      <div class="hbox"><table class="ht"><thead><tr><th></th><th>Carga</th><th>Envio</th><th>Galpão</th><th>Loja</th><th>Status</th><th>R.F. informado</th><th>Cronograma até</th><th>Agenda ML</th></tr></thead><tbody>
+      ${grupo.map(r=>`<tr><td style="width:16px">${ckb(r.id)}</td><td class="big">${cgBtn(r)}</td><td class="mono">${esc(r.envio)||"—"}</td><td>${esc(r.galpao)||"—"}</td><td>${esc(r.loja)||"—"}</td><td>${ST[r.cod].nome}</td><td class="mono">${r.rfInfo?br(r.rf)+' · <span class="rfok">informado ✓</span>':'<span class="rfpend">pendente</span>'}</td><td class="mono">${br(r.lim)} · ${prazoTxt(r.duLim)}</td><td class="mono">${br(r.agenda)} · ${prazoTxt(r.duAg)}</td></tr>`).join("")}
       </tbody></table></div></div>`
     :`<div class="hero" style="--hc:var(--ok)"><div class="hh"><span class="label">Próxima carga para produção</span><span class="d">${semAgenda.length?"Nenhuma carga agendada pendente de produção.":"Nenhuma carga pendente de produção."}</span></div></div>`;
   const avisoAgenda=semAgenda.length?`<div class="hero" style="--hc:var(--high)"><div class="hh"><span class="label">Aguardando envio e agenda</span><span class="d">${pl(semAgenda.length,"carga roteirizada","cargas roteirizadas")} sem envio e data de agenda${sumVol(semAgenda)}</span></div><span class="small" style="color:var(--band-muted)">Depois de agendar no portal do Mercado Livre, marque as cargas e use <b>Agendar</b> na barra de baixo, ou abra a carga. Assim o painel calcula o cronograma e o R.F.</span></div>`:"";
@@ -1092,7 +1096,7 @@ function vPainel(){
     const cards=list.slice(0,MAX).map(r=>`<div class="card ${sel.has(r.id)?"on":""}" style="${av(r)}">
         <div class="r1"><label class="ck">${ckb(r.id)}</label><span style="flex:1;min-width:0">${cgBtn(r)}</span><span class="tag ${r.nivel==="ok"?"soft":""}">${r.alerta}</span></div>
         <div class="env">${r.envio?"Envio "+esc(r.envio):"Sem envio"}${r.galpao?" · Galpão "+esc(r.galpao):""}${r.loja?" · Loja "+esc(r.loja):""}${r.volume!=null?" · "+fmtN(r.volume)+(r.volume===1?" palete":" paletes"):""}${r.obs?" · "+esc(r.obs):""}</div>
-        <div class="r2">${!r.agenda?`<span><span class="k">Sem envio e agenda · agende no portal ML e informe aqui</span></span>`:c===1?`<span><span class="k">Informar R.F.</span> <b>${br(r.rf)}</b> ${wdS(r.rf)} · ${r.rfInfo?'<span class="rfok">informado ✓</span>':prazoTxt(r.duRf)}</span><span><span class="k">Cronograma até</span> <b>${br(r.lim)}</b> ${wdS(r.lim)} · ${prazoTxt(r.duLim)}</span>`:""}<span>${r.agenda?`<span class="k">Agenda</span> <b>${br(r.agenda)}</b> ${wdS(r.agenda)}${c!==1?" · "+prazoTxt(r.duAg):""}`:""}</span></div>
+        <div class="r2">${!r.agenda?`<span><span class="k">Sem envio e agenda · agende no portal ML e informe aqui</span></span>`:c===1?`<span><span class="k">R.F.</span> ${rfLin(r)}</span><span><span class="k">Cronograma até</span> <b>${br(r.lim)}</b> ${wdS(r.lim)} · ${prazoTxt(r.duLim)}</span>`:""}<span>${r.agenda?`<span class="k">Agenda</span> <b>${br(r.agenda)}</b> ${wdS(r.agenda)}${c!==1?" · "+prazoTxt(r.duAg):""}`:""}</span></div>
         ${canWrite?`<div class="r3">${c===1&&r.agenda&&!r.rfInfo?`<button class="adv rfb" data-rf1="${esc(r.id)}" title="Marcar que o R.F. já foi informado">✓ R.F. informado</button>`:""}<button class="adv" data-adv="${esc(r.id)}" title="Registrar avanço com a data de hoje">→ ${ST[c+1].nome}</button></div>`:""}
       </div>`).join("");
     const sub={1:"roteirizadas, ainda fora do cronograma",2:"no cronograma, aguardando produção",3:"produzindo agora"}[c];
@@ -1134,7 +1138,7 @@ function vPainel(){
   const trow=r=>`<tr class="${aberta(r)?"":"closed"} ${r.nivel==="crit"?"crit":""} ${sel.has(r.id)?"on":""}" style="${cv(r.cod)};${av(r)}">
       <td class="w">${ckb(r.id)}</td><td class="mono">${r.envio?esc(r.envio):'<span class="small">sem envio</span>'}</td><td class="mono">${cgBtn(r)}</td><td>${esc(r.galpao)||"—"}</td><td class="mono">${esc(r.loja)||"—"}</td>
       <td><span class="pill">${ST[r.cod].nome}</span></td><td class="mono">${br(r.rot)}</td>
-      <td class="mono">${br(r.rf)}${r.cod===1?`<div class="small">${r.rfInfo?'<span class="rfok">informado ✓</span>':prazoTxt(r.duRf)}</div>`:""}</td>
+      <td class="mono">${rfCel(r)}</td>
       <td class="mono">${br(r.lim)}${r.cod===1?`<div class="small">${prazoTxt(r.duLim)}</div>`:""}</td>
       <td class="mono">${br(r.agenda)}<div class="small">${aberta(r)?prazoTxt(r.duAg):""}</div></td>
       <td class="num mono">${r.volume!=null?fmtN(r.volume):"—"}</td>
@@ -1149,10 +1153,10 @@ function vPainel(){
         ${cnt[0]?`<div class="pipex"><button class="chip" data-f="0" aria-pressed="${filtro==="0"}">${ST[0].nome}: ${cnt[0]}</button></div>`:""}</section>
       <section style="display:grid;gap:10px">
         <div class="bar fila"><div class="label">Fila de acompanhamento · críticas primeiro</div><div class="chips">${chips}</div></div>
-        <div class="tablebox"><table class="t"><thead><tr><th class="w"><input type="checkbox" id="selall" ${visAll?"checked":""} ${visSome&&!visAll?'data-ind="1"':""} aria-label="Selecionar todas desta visão"></th><th>Envio</th><th>Carga</th><th>Galpão</th><th>Loja</th><th>Status</th><th>Roteirização</th><th>Informar R.F.</th><th>Cronograma até</th><th>Agenda ML</th><th class="num">Paletes</th><th>Ação</th><th>Alerta</th><th>Obs.</th></tr></thead>
+        <div class="tablebox"><table class="t"><thead><tr><th class="w"><input type="checkbox" id="selall" ${visAll?"checked":""} ${visSome&&!visAll?'data-ind="1"':""} aria-label="Selecionar todas desta visão"></th><th>Envio</th><th>Carga</th><th>Galpão</th><th>Loja</th><th>Status</th><th>Roteirização</th><th>R.F. informado</th><th>Cronograma até</th><th>Agenda ML</th><th class="num">Paletes</th><th>Ação</th><th>Alerta</th><th>Obs.</th></tr></thead>
         <tbody>${vis.length?vis.map(trow).join(""):`<tr><td colspan="14" class="empty">Nenhuma carga nesta visão.</td></tr>`}</tbody></table></div>
       </section>
-      <footer><div>"Cronograma até" é calculado: agenda menos ${pl(cfg.regraDias,"dia útil","dias úteis")}. "Informar R.F." é ${pl(cfg.rfDias,"dia útil","dias úteis")} antes do cronograma.${cfg.regraTerca?" Agenda na terça: R.F. na sexta anterior e cronograma até o sábado.":""} A expedição é na véspera da agenda, porque a entrega é na madrugada do dia agendado. Dias úteis sem sábados, domingos e feriados${cfg.feriadosExtras.length?" (nacionais + "+cfg.feriadosExtras.length+" cadastrados)":" nacionais"}.</div>
+      <footer><div>"Cronograma até" é calculado: agenda menos ${pl(cfg.regraDias,"dia útil","dias úteis")}. O R.F. pode ser informado em qualquer dia antes do cronograma; a coluna mostra o dia em que foi informado.${cfg.regraTerca?" Agenda na terça: cronograma até o sábado.":""} A expedição é na véspera da agenda, porque a entrega é na madrugada do dia agendado. Dias úteis sem sábados, domingos e feriados${cfg.feriadosExtras.length?" (nacionais + "+cfg.feriadosExtras.length+" cadastrados)":" nacionais"}.</div>
       <div>${modoLocal?"Os dados ficam guardados neste navegador. Mudou status por aqui? Clique em Baixar base e salve a planilha na pasta da equipe: ela leva o histórico e as regras, e quem carregar essa planilha vê tudo igual.":"As mudanças de status feitas aqui ficam salvas para toda a equipe e entram no histórico de cada carga."} Marque cargas para exportar ou mudar o status de várias de uma vez.</div></footer>
     </div>`;
 }
@@ -1173,6 +1177,7 @@ function sumVol(list){const v=list.filter(r=>r.volume!=null);if(!v.length)return
 /* ---------- aba Calendário ---------- */
 function segunda(n){const w=new Date(n*864e5).getUTCDay();return n-((w+6)%7);}
 function vCalendario(){
+  if(calModo==="rf") calModo="cron";
   if(calStart==null) calStart=segunda(hojeN());
   const hoje=hojeN();
   const dateOf=(r)=>calModo==="cron"?r.lim:calModo==="rf"?r.rf:r.agenda;
@@ -1236,7 +1241,7 @@ function vCalendario(){
     nav=`<button class="btn ghost sm" data-cal="-7" aria-label="Semana anterior">←</button><button class="btn ghost sm" data-cal="0">Esta semana</button><button class="btn ghost sm" data-cal="7" aria-label="Próxima semana">→</button>`; }
   return `<div class="in main">
     <div class="calbar"><div class="actions">${vistaSeg}${nav}<h2 style="margin-left:6px">${titulo}</h2>${extra}</div>
-      <div class="seg" role="group" aria-label="Data usada"><button data-calm="rf" aria-pressed="${calModo==="rf"}">Informar R.F.</button><button data-calm="cron" aria-pressed="${calModo==="cron"}">Cronograma até</button><button data-calm="agenda" aria-pressed="${calModo==="agenda"}">Agenda ML</button></div></div>
+      <div class="seg" role="group" aria-label="Data usada"><button data-calm="cron" aria-pressed="${calModo==="cron"}">Cronograma até</button><button data-calm="agenda" aria-pressed="${calModo==="agenda"}">Agenda ML</button></div></div>
     ${corpo}
     ${(()=>{const sem=conj.filter(e=>envAll.get(e).some(r=>diasRef.includes(dayOf(dateOf(r)))&&(!galpaoF||(r.galpao||"__sem")===galpaoF)));
       if(!sem.length) return "";
@@ -1328,6 +1333,7 @@ function fechar(){openId=null;dForm=null;$("#drawer").innerHTML="";}
 function histTxt(h){
   if(h.tipo==="status") return h.de==null?`Entrou no painel como <b>${ST[h.para]?ST[h.para].nome:"?"}</b>`:`Status: ${ST[h.de]?ST[h.de].nome:"?"} → <b>${ST[h.para]?ST[h.para].nome:"?"}</b>`;
   if(h.tipo==="rf") return h.para?`<b>R.F. informado</b> ✓`:`R.F. informado foi <b>desmarcado</b>`;
+  if(h.tipo==="rfdia") return `Dia do R.F. informado: ${brA(h.de)||"—"} → <b>${brA(h.para)}</b>`;
   const nm={agenda:"Agenda",galpao:"Galpão",loja:"Loja destino",envio:"Envio",rot:"Roteirização",volume:"Paletes",pbr:"Paletes PBR",chep:"Paletes CHEP"}[h.tipo]||h.tipo;
   const f=(v)=>h.tipo==="agenda"||h.tipo==="rot"?brA(v):(v===""||v==null?"—":["volume","pbr","chep"].includes(h.tipo)?fmtN(v):esc(v));
   return `${nm}: ${f(h.de)} → <b>${f(h.para)}</b>`;
@@ -1343,13 +1349,12 @@ function renderDrawerInfo(){
       <div><span class="label">Envio</span><span class="v mono">${esc(r.envio)}</span></div>
       <div><span class="label">Galpão</span><span class="v">${esc(r.galpao)||"—"}</span></div>
       <div><span class="label">Loja destino</span><span class="v mono">${esc(r.loja)||"—"}</span></div>
-      <div><span class="label">Informar R.F.</span><span class="v mono">${brA(r.rf)} ${wdS(r.rf)}${r.cod===1?" · "+prazoTxt(r.duRf):""}</span></div>
       <div><span class="label">Cronograma até</span><span class="v mono">${brA(r.lim)} ${wdS(r.lim)}${r.cod===1?" · "+prazoTxt(r.duLim):""}</span></div>
       <div><span class="label">Expedição (véspera da agenda)</span><span class="v mono">${r.exp?brA(r.exp)+" "+wdS(r.exp):"—"}</span></div>
       <div><span class="label">Agenda ML</span><span class="v mono">${brA(r.agenda)} ${wdS(r.agenda)}${aberta(r)?" · "+prazoTxt(r.duAg):""}</span></div>
       <div><span class="label">Roteirização</span><span class="v mono">${brA(r.rot)}</span></div>
       <div><span class="label">Paletes</span><span class="v mono">${r.volume!=null?fmtN(r.volume):"—"}${r.pbr!=null||r.chep!=null?` <span class="small">· PBR ${r.pbr??"—"} · CHEP ${r.chep??"—"}</span>`:""}</span></div>
-      ${r.cod===1&&r.agenda?`<div style="grid-column:1/-1" class="rfbox ${r.rfInfo?"ok":""}"><span class="label">R.F.${r.terca?" · agenda de terça: R.F. na sexta":""}</span><span class="v">${r.rfInfo?`Informado ✓ em ${dtHora(r.rfInfo.em)}${nomeDe(r.rfInfo.por)||r.rfInfo.porNome?" por "+esc(nomeDe(r.rfInfo.por)||r.rfInfo.porNome):""}`:`Ainda não informado · ${brA(r.rf)} ${wdS(r.rf)}`}</span>${canWrite?`<button class="btn ${r.rfInfo?"ghost":""} sm" data-rf1="${esc(r.id)}">${r.rfInfo?"Desmarcar":"Marcar R.F. informado"}</button>`:""}</div>`:""}
+      ${(r.cod===1&&r.agenda)||r.rfInfo?`<div style="grid-column:1/-1" class="rfbox ${r.rfInfo?"ok":""}"><span class="label">R.F.</span><span class="v">${r.rfInfo?`Informado ✓ em ${canWrite?`<input type="date" class="rfdia" data-rfdia="${esc(r.id)}" value="${esc(r.rf)}" max="${hojeIso()}" aria-label="Dia em que o R.F. foi informado">`:`<b>${brA(r.rf)}</b>`} <span class="small">marcado em ${dtHora(r.rfInfo.em)}${nomeDe(r.rfInfo.por)||r.rfInfo.porNome?" por "+esc(nomeDe(r.rfInfo.por)||r.rfInfo.porNome):""}</span>`:`Pendente · informe até o cronograma (${brA(r.lim)} ${wdS(r.lim)})`}</span>${canWrite&&r.cod===1?`<button class="btn ${r.rfInfo?"ghost":""} sm" data-rf1="${esc(r.id)}">${r.rfInfo?"Desmarcar":"Marcar R.F. informado (hoje)"}</button>`:""}</div>`:""}
       ${r.acao?`<div style="grid-column:1/-1"><span class="label">Próxima ação</span><span class="v">${esc(r.acao)}</span></div>`:""}
     </div>
     ${online&&window.PAINEL_EXT?(()=>{const l=PAINEL_EXT.ocDaCarga(r.carga), ab=l.filter(o=>o.status==="aberta");
@@ -1418,12 +1423,21 @@ async function avancar(id){
     marcarSujo(true); setToast(`Carga ${r?r.carga:""} → ${ST[novo].nome} (hoje). Para outra data, abra a carga.`); }
   catch(e){ setToast(erroTxt(e),true); }
 }
+async function salvarRfDia(id,dia){
+  const d=docs.get(id); if(!d||!d.rfInfo||!d.rfInfo.em) return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(dia||"")||dia>hojeIso()){setToast("Escolha um dia até hoje.",true);if(openId)renderDrawer();return;}
+  const antes=rfDiaDe(d.rfInfo); if(antes===dia) return; const now=new Date().toISOString();
+  try{await db.collection("cargas").doc(id).update({rfInfo:{...d.rfInfo,dia},hist:(d.hist||[]).concat([{tipo:"rfdia",de:antes,para:dia,em:hojeIso(),reg:now,por:meId||null,origem:"painel"}]),atualizadoEm:now,atualizadoPor:meId||null});
+    marcarSujo(true); setToast(`Dia do R.F. informado alterado para ${brA(dia)}.`);}
+  catch(e){setToast(erroTxt(e),true);}
+  if(openId) renderDrawer();
+}
 async function marcarRF(ids,valor){
   const now=new Date().toISOString(); let ok=0, err=null;
   const alvo=ids.filter(id=>{const d=docs.get(id);return d&&(typeof d.status==="number"?d.status:1)===1&&!!(d.rfInfo&&d.rfInfo.em)!==valor;});
   if(!alvo.length){setToast(valor?"Nenhuma carga selecionada está aguardando R.F.":"Nada para desmarcar.");return;}
   await emLotes(alvo,4,async(id)=>{const d=docs.get(id);
-    try{await db.collection("cargas").doc(id).update({rfInfo:valor?{em:now,por:meId||null,porNome:online?online.nome:""}:null,hist:(d.hist||[]).concat([{tipo:"rf",de:!valor,para:valor,em:hojeIso(),reg:now,por:meId||null,origem:"painel"}]),atualizadoEm:now,atualizadoPor:meId||null});ok++;}catch(e){err=e;}});
+    try{await db.collection("cargas").doc(id).update({rfInfo:valor?{em:now,dia:hojeIso(),por:meId||null,porNome:online?online.nome:""}:null,hist:(d.hist||[]).concat([{tipo:"rf",de:!valor,para:valor,em:hojeIso(),reg:now,por:meId||null,origem:"painel"}]),atualizadoEm:now,atualizadoPor:meId||null});ok++;}catch(e){err=e;}});
   if(ok) marcarSujo(true);
   setToast(err?`${ok} de ${alvo.length} marcadas. ${erroTxt(err)}`:valor?`R.F. informado ✓ em ${pl(ok,"carga")}. O alerta saiu.`:`R.F. desmarcado em ${pl(ok,"carga")}.`,!!err);
   if(openId) renderDrawer();
@@ -1487,34 +1501,33 @@ const D12=(s)=>{if(!s)return "";const [y,m,d]=s.split("-").map(Number);return ne
 const serial=(s)=>{const n=dayOf(s);return n==null?null:n+25569;}; // data → número de série do Excel
 function planilhaBase(list,comHist){
   const H=4; // linha do cabeçalho
-  const aoa=[["BASE DE CARGAS — Painel de Cargas","","","","","","","","","","","DIAS ÚTEIS ANTES DA AGENDA (altere aqui)","DIAS ÚTEIS ANTES DO CRONOGRAMA P/ INFORMAR R.F. (altere aqui)","REGRA DA TERÇA: R.F. NA SEXTA (1 = sim, 0 = não)"],
-    ["Uma linha por carga (repita o envio quando tiver mais de uma carga). PALETES vem do WMS; PBR e CHEP você preenche (só o PBR volta). As datas de cronograma e de informar R.F. são calculadas pelas regras das células L2, M2 e N2. Não mude os nomes do cabeçalho.","","","","","","","","","","",cfg.regraDias,cfg.rfDias,cfg.regraTerca?1:0],
+  const aoa=[["BASE DE CARGAS — Painel de Cargas","","","","","","","","","","","DIAS ÚTEIS ANTES DA AGENDA (altere aqui)","REGRA DA TERÇA: CRONOGRAMA ATÉ SÁBADO (1 = sim, 0 = não)"],
+    ["Uma linha por carga (repita o envio quando tiver mais de uma carga). PALETES vem do WMS; PBR e CHEP você preenche (só o PBR volta). A data do cronograma é calculada pelas regras das células L2 e M2. R.F. INFORMADO é o dia em que o R.F. foi informado (deixe em branco se ainda não foi). Não mude os nomes do cabeçalho.","","","","","","","","","","",cfg.regraDias,cfg.regraTerca?1:0],
     [],
-    ["#ENVIO","CARGA","GALPÃO","LOJA DESTINO","DATA ROTEIRIZAÇÃO","DATA AGENDA","STATUS","PALETES","PALETES PBR","PALETES CHEP","OBSERVAÇÃO","DATA CRONOGRAMA (calculada)","DATA INFORMAR R.F. (calculada)","R.F. INFORMADO","ALERTA (na exportação)","AÇÃO (na exportação)"]]
-    .concat(list.map(r=>[num(r.envio),num(r.carga),r.galpao,num(r.loja),D12(r.rot),D12(r.agenda),ST[r.cod].plan,r.volume==null?"":r.volume,r.pbr==null?"":r.pbr,r.chep==null?"":r.chep,r.obs,"","",r.rfInfo?new Date(r.rfInfo.em):"",r.alerta,r.acao]));
+    ["#ENVIO","CARGA","GALPÃO","LOJA DESTINO","DATA ROTEIRIZAÇÃO","DATA AGENDA","STATUS","PALETES","PALETES PBR","PALETES CHEP","OBSERVAÇÃO","DATA CRONOGRAMA (calculada)","R.F. INFORMADO","ALERTA (na exportação)","AÇÃO (na exportação)"]]
+    .concat(list.map(r=>[num(r.envio),num(r.carga),r.galpao,num(r.loja),D12(r.rot),D12(r.agenda),ST[r.cod].plan,r.volume==null?"":r.volume,r.pbr==null?"":r.pbr,r.chep==null?"":r.chep,r.obs,"",r.rfInfo?D12(r.rf):"",r.alerta,r.acao]));
   const ws=XLSX.utils.aoa_to_sheet(aoa,{cellDates:true,dateNF:"dd/mm/yyyy"});
   const anos=[...new Set([hojeN(),...list.map(r=>dayOf(r.agenda)).filter(x=>x!=null)].map(n=>new Date(n*864e5).getUTCFullYear()))];
   const y0=Math.min(...anos), y1=Math.max(...anos)+1;
   const fer=[]; for(let y=y0;y<=y1;y++) feriadosNac(y).forEach(f=>fer.push([f.d,f.n]));
   (cfg.feriadosExtras||[]).forEach(d=>fer.push([d,"Feriado extra (cadastrado no painel)"])); fer.sort((a,b)=>a[0].localeCompare(b[0]));
   const ferRef=`FERIADOS!$A$2:$A$${Math.max(fer.length+1,2)+40}`;
-  list.forEach((r,i)=>{const row=H+1+i; const v=serial(r.lim), w=serial(r.rf);
-    const ter=`AND($N$2=1,WEEKDAY(F${row},2)=2)`;
+  list.forEach((r,i)=>{const row=H+1+i; const v=serial(r.lim);
+    const ter=`AND($M$2=1,WEEKDAY(F${row},2)=2)`;
     ws["L"+row]={t:v==null?"s":"n",v:v==null?"":v,f:`IF(F${row}="","",IF(${ter},F${row}-3,WORKDAY(F${row},-$L$2,${ferRef})))`,z:"dd/mm/yyyy"};
-    ws["M"+row]={t:w==null?"s":"n",v:w==null?"":w,f:`IF(L${row}="","",IF(${ter},WORKDAY(F${row}-3,-1,${ferRef}),WORKDAY(L${row},-$M$2,${ferRef})))`,z:"dd/mm/yyyy"};
-    if(r.rfInfo&&ws["N"+row]) ws["N"+row].z="dd/mm/yyyy hh:mm";});
-  ws["L2"]={t:"n",v:cfg.regraDias}; ws["M2"]={t:"n",v:cfg.rfDias}; ws["N2"]={t:"n",v:cfg.regraTerca?1:0};
+    if(r.rfInfo&&ws["M"+row]) ws["M"+row].z="dd/mm/yyyy";});
+  ws["L2"]={t:"n",v:cfg.regraDias}; ws["M2"]={t:"n",v:cfg.regraTerca?1:0};
   ws["!merges"]=[{s:{r:1,c:0},e:{r:1,c:10}}];
-  ws["!cols"]=[12,12,10,12,18,14,24,9,11,12,30,22,24,18,22,24].map(w=>({wch:w})); ws["!autofilter"]={ref:`A${H}:P${H+list.length}`};
+  ws["!cols"]=[12,12,10,12,18,14,24,9,11,12,30,22,16,22,24].map(w=>({wch:w})); ws["!autofilter"]={ref:`A${H}:O${H+list.length}`};
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"BASE");
   const fs=XLSX.utils.aoa_to_sheet([["FERIADO","DESCRIÇÃO"]].concat(fer.map(([d,n])=>[D12(d),n])),{cellDates:true,dateNF:"dd/mm/yyyy"});
   fs["!cols"]=[{wch:14},{wch:36}]; XLSX.utils.book_append_sheet(wb,fs,"FERIADOS");
   if(comHist){
     const h=[["#ENVIO","CARGA","REGISTRADO EM","O QUE MUDOU","DE","PARA","DATA DO FATO","ORIGEM","QUEM"]];
-    list.forEach(r=>r.hist.forEach(x=>{const st=x.tipo==="status"; if(x.tipo==="rf"){h.push([num(r.envio),num(r.carga),x.reg?new Date(x.reg):"","RF",String(!!x.de),String(!!x.para),"",x.origem==="base"?"planilha":"painel",nomeDe(x.por)||x.porNome||""]);return;}h.push([num(r.envio),num(r.carga),x.reg?new Date(x.reg):"",st?"STATUS":x.tipo.toUpperCase(),st?(x.de==null?"":ST[x.de]?ST[x.de].plan:""):String(x.de??""),st?(ST[x.para]?ST[x.para].plan:""):String(x.para??""),st?D12(x.em):"",x.origem==="base"?"planilha":x.origem==="wms"?"WMS":x.origem==="inicial"?"situação inicial":"painel",nomeDe(x.por)||x.porNome||""]);}));
+    list.forEach(r=>r.hist.forEach(x=>{const st=x.tipo==="status"; if(x.tipo==="rfdia"){h.push([num(r.envio),num(r.carga),x.reg?new Date(x.reg):"","DIA DO RF",x.de?D12(x.de):"",x.para?D12(x.para):"","",x.origem==="base"?"planilha":"painel",nomeDe(x.por)||x.porNome||""]);return;}if(x.tipo==="rf"){h.push([num(r.envio),num(r.carga),x.reg?new Date(x.reg):"","RF",String(!!x.de),String(!!x.para),"",x.origem==="base"?"planilha":"painel",nomeDe(x.por)||x.porNome||""]);return;}h.push([num(r.envio),num(r.carga),x.reg?new Date(x.reg):"",st?"STATUS":x.tipo.toUpperCase(),st?(x.de==null?"":ST[x.de]?ST[x.de].plan:""):String(x.de??""),st?(ST[x.para]?ST[x.para].plan:""):String(x.para??""),st?D12(x.em):"",x.origem==="base"?"planilha":x.origem==="wms"?"WMS":x.origem==="inicial"?"situação inicial":"painel",nomeDe(x.por)||x.porNome||""]);}));
     const hs=XLSX.utils.aoa_to_sheet(h,{cellDates:true,dateNF:"dd/mm/yyyy"}); hs["!cols"]=[12,12,18,14,24,24,14,16,24].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb,hs,"HISTÓRICO");
-    const rg=[["REGRA","VALOR"],["DIAS ÚTEIS ANTES DA AGENDA",cfg.regraDias],["DIAS ÚTEIS P/ INFORMAR R.F. (ANTES DO CRONOGRAMA)",cfg.rfDias],["ALERTA ATENÇÃO (DIAS ÚTEIS)",cfg.atencaoDias],["REGRA DA TERÇA: R.F. NA SEXTA (1 = SIM, 0 = NÃO)",cfg.regraTerca?1:0]].concat((cfg.feriadosExtras||[]).map(f=>["FERIADO EXTRA",D12(f)]));
+    const rg=[["REGRA","VALOR"],["DIAS ÚTEIS ANTES DA AGENDA",cfg.regraDias],["ALERTA ATENÇÃO (DIAS ÚTEIS)",cfg.atencaoDias],["REGRA DA TERÇA: CRONOGRAMA ATÉ SÁBADO (1 = SIM, 0 = NÃO)",cfg.regraTerca?1:0]].concat((cfg.feriadosExtras||[]).map(f=>["FERIADO EXTRA",D12(f)]));
     const rs=XLSX.utils.aoa_to_sheet(rg,{cellDates:true,dateNF:"dd/mm/yyyy"}); rs["!cols"]=[{wch:30},{wch:14}];
     XLSX.utils.book_append_sheet(wb,rs,"REGRAS");
   }
@@ -1562,17 +1575,17 @@ function resumo(){
   const hoje=hojeN(), ab=rows.filter(aberta);
   const g=(l)=>{const m=new Map();l.forEach(r=>{const k=r.galpao||"sem galpão";if(!m.has(k))m.set(k,[]);m.get(k).push(r.carga);});return [...m.entries()].map(([k,v])=>`   ${k}: ${v.join(", ")}`).join("\n");};
   const bloco=(t,l)=>l.length?`\n*${t} (${l.length})*\n${g(l)}`:"";
-  const rfHoje=ab.filter(r=>r.alerta==="Informar R.F. hoje"), rfAtras=ab.filter(r=>r.alerta==="R.F. atrasado");
+  const rfPend=ab.filter(r=>r.cod===1&&r.agenda&&!r.rfInfo&&r.duLim!=null&&r.duLim>=0);
   const incluirHoje=ab.filter(r=>r.cod===1&&r.duLim===0), vencido=ab.filter(r=>r.cod===1&&r.duLim!=null&&r.duLim<0);
   const prox=ab.filter(r=>r.cod===1&&r.duLim>0&&r.duLim<=cfg.atencaoDias);
   const risco=ab.filter(r=>r.alerta==="Risco de atraso"), expHoje=ab.filter(r=>r.alerta==="Expedir hoje"), atras=ab.filter(r=>r.alerta==="Expedição atrasada"||r.alerta==="Entrega atrasada"), confEnt=ab.filter(r=>r.alerta==="Confirmar entrega");
   const emProd=ab.filter(r=>r.cod===3), aProd=ab.filter(r=>r.cod===2);
   let t=`*Painel de Cargas · ${brA(hojeIso())} (${wd(hoje)})*${galpaoF?" · "+(galpaoF==="__sem"?"sem galpão":"Galpão "+galpaoF):""}`;
-  t+=bloco("Fora do prazo do cronograma",vencido)+bloco("R.F. atrasado",rfAtras)+bloco("Informar R.F. hoje",rfHoje)+bloco("Incluir no cronograma hoje",incluirHoje)+bloco(`Incluir nos próximos ${cfg.atencaoDias} d.u.`,prox)+bloco("Expedição atrasada",atras)+bloco("Expedir hoje",expHoje)+bloco("Risco de atraso",risco)+bloco("Confirmar entrega",confEnt);
+  t+=bloco("Fora do prazo do cronograma",vencido)+bloco("Incluir no cronograma hoje",incluirHoje)+bloco(`Incluir nos próximos ${cfg.atencaoDias} d.u.`,prox)+bloco("Expedição atrasada",atras)+bloco("Expedir hoje",expHoje)+bloco("Risco de atraso",risco)+bloco("Confirmar entrega",confEnt)+bloco("R.F. pendente",rfPend);
   t+=`\n\nEm produção: ${emProd.length} · Próximas a produzir: ${aProd.length} · Aguardando cronograma: ${ab.filter(r=>r.cod===1).length} · Em aberto: ${ab.length}`;
   const pal=window.PAINEL_EXT&&PAINEL_EXT.paletesSaldo?PAINEL_EXT.paletesSaldo():null;
   if(pal) t+=`\nSaldo de paletes PBR a devolver: ${pal.saldo} de ${pal.limite}${pal.nivel==="limite"?" · LIMITE ATINGIDO: pedir o retorno":pal.nivel==="aviso"?" · perto do limite":""}`;
-  if(!vencido.length&&!incluirHoje.length&&!atras.length&&!rfAtras.length&&!risco.length) t+="\nSem pendências críticas hoje.";
+  if(!vencido.length&&!incluirHoje.length&&!atras.length&&!risco.length) t+="\nSem pendências críticas hoje.";
   return t;
 }
 /* janela de texto pronto para copiar (resumo do dia, mensagens prontas) */
@@ -1630,7 +1643,8 @@ async function expedirEnvio(env){
 /* ================= importação com conferência ================= */
 function toISO(v){
   if(v==null||v==="") return "";
-  if(v instanceof Date){const d=new Date(v.getTime()+12*36e5);return iso(d.getFullYear(),d.getMonth()+1,d.getDate());}
+  /* data do Excel: pode vir à meia-noite (às vezes com segundos a mais ou a menos) ou ao meio-dia (planilha baixada do painel e salva no Excel). Somar 6 h acerta o dia nos dois casos. */
+  if(v instanceof Date){const d=new Date(v.getTime()+6*36e5);return iso(d.getFullYear(),d.getMonth()+1,d.getDate());}
   if(typeof v==="number"){const p=XLSX.SSF.parse_date_code(v);return p?iso(p.y,p.m,p.d):"";}
   const s=String(v).trim(); let m;
   if(m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?$/)){let y=+m[3];if(y<100)y+=2000;return iso(y,+m[2],+m[1]);}
@@ -1747,9 +1761,9 @@ function lerRegras(wb,topo){
 }
 function diffRegras(rg){ // o que a planilha muda nas regras atuais
   if(!rg) return null; const n={regraDias:cfg.regraDias,rfDias:cfg.rfDias,atencaoDias:cfg.atencaoDias,regraTerca:cfg.regraTerca,feriadosExtras:(cfg.feriadosExtras||[]).slice().sort()}; const t=[];
-  if(rg.regraTerca!=null&&rg.regraTerca!==cfg.regraTerca){t.push(rg.regraTerca?"liga a regra da terça (R.F. na sexta)":"desliga a regra da terça");n.regraTerca=rg.regraTerca;}
+  if(rg.regraTerca!=null&&rg.regraTerca!==cfg.regraTerca){t.push(rg.regraTerca?"liga a regra da terça (cronograma até sábado)":"desliga a regra da terça");n.regraTerca=rg.regraTerca;}
   if(rg.regraDias!=null&&rg.regraDias!==cfg.regraDias){t.push(`regra de ${cfg.regraDias} para ${pl(rg.regraDias,"dia útil","dias úteis")} antes da agenda`);n.regraDias=rg.regraDias;}
-  if(rg.rfDias!=null&&rg.rfDias!==cfg.rfDias){t.push(`informar R.F. de ${cfg.rfDias} para ${pl(rg.rfDias,"dia útil","dias úteis")} antes do cronograma`);n.rfDias=rg.rfDias;}
+  if(false&&rg.rfDias!=null&&rg.rfDias!==cfg.rfDias){t.push(`informar R.F. de ${cfg.rfDias} para ${pl(rg.rfDias,"dia útil","dias úteis")} antes do cronograma`);n.rfDias=rg.rfDias;}
   if(rg.atencaoDias!=null&&rg.atencaoDias!==cfg.atencaoDias){t.push(`alerta de atenção de ${cfg.atencaoDias} para ${rg.atencaoDias} d.u.`);n.atencaoDias=rg.atencaoDias;}
   if(rg.feriadosExtras&&JSON.stringify(rg.feriadosExtras)!==JSON.stringify(n.feriadosExtras)){const add=rg.feriadosExtras.filter(d=>!n.feriadosExtras.includes(d)),rem=n.feriadosExtras.filter(d=>!rg.feriadosExtras.includes(d));
     if(add.length)t.push(`inclui ${pl(add.length,"feriado extra","feriados extras")} (${add.map(brA).join(", ")})`); if(rem.length)t.push(`tira ${pl(rem.length,"feriado extra","feriados extras")} (${rem.map(brA).join(", ")})`); n.feriadosExtras=rg.feriadosExtras;}
@@ -1860,10 +1874,12 @@ function prever(arquivo,lp){
     const camp={}; [["envio",l.envio],["galpao",l.galpao],["loja",l.loja],["rot",l.rot],["agenda",l.agenda],["obs",l.obs]].forEach(([k,v])=>{ if((k==="envio"||k==="agenda")&&!v) return; if(k==="galpao"&&!lp.temGalpao) return; if(k==="loja"&&!lp.temLoja) return; if(String(v||"")!==String(ex[k]||"")) camp[k]=v; });
     if(lp.temVolume){const ov=typeof ex.volume==="number"?ex.volume:null; if(l.volume!==ov) camp.volume=l.volume;}
     if(lp.temPbr){["pbr","chep"].forEach(k=>{const ov=typeof ex[k]==="number"?ex[k]:null; if(l[k]!==ov&&!(l[k]==null&&!modoLocal)) camp[k]=l[k];});}
-    if(lp.temRf&&l.rf&&!(ex.rfInfo&&ex.rfInfo.em)&&(typeof ex.status==="number"?ex.status:1)===1) camp.rfInfo={em:l.rf,por:null,porNome:"planilha"};
+    if(lp.temRf&&l.rf){const nd=rfDiaDe({em:l.rf});
+      if(!(ex.rfInfo&&ex.rfInfo.em)){ if((typeof ex.status==="number"?ex.status:1)===1) camp.rfInfo={em:l.rf,dia:nd,por:null,porNome:"planilha"}; }
+      else if(nd&&nd!==rfDiaDe(ex.rfInfo)) camp.rfInfo={...ex.rfInfo,dia:nd}; }
     const at=typeof ex.status==="number"?ex.status:1; let st=null;
     if(sc!=null&&sc!==at){ if(POS(sc)>POS(at)) st=sc; else atras.push({id,l,de:at,para:sc,baseHist:ex.hist||[]}); }
-    if(st!=null||Object.keys(camp).length||histMudou) mud.push({id,l,camp,de:at,para:st,baseHist:ex.hist||[],histMudou}); else if(!(sc!=null&&sc!==at)) iguais.push(id);
+    if(st!=null||Object.keys(camp).length||histMudou) mud.push({id,l,camp,de:at,para:st,baseHist:ex.hist||[],histMudou,rfJa:!!(ex.rfInfo&&ex.rfInfo.em)}); else if(!(sc!=null&&sc!==at)) iguais.push(id);
   });
   const ids=new Set(seen.keys());
   const fora=[...docs.entries()].filter(([id,d])=>!ids.has(id)&&(typeof d.status==="number"?d.status:1)>=1&&(typeof d.status==="number"?d.status:1)<=5).map(([id,d])=>({id,d}));
@@ -1876,7 +1892,7 @@ function renderImp(){
   if(imp.tipo==="wms") return renderImpWMS();
   const p=imp, ne=p.probs.filter(x=>x.sev==="e").length, nw=p.probs.length-ne;
   const nStatus=p.mud.filter(m=>m.para!=null).length+(p.aplicarAtras?p.atras.length:0);
-  const linhaMud=(m)=>{const parts=[];if(m.histMudou&&m.para==null&&!Object.keys(m.camp).length)parts.push("histórico atualizado pela planilha");if(m.para!=null)parts.push(`${ST[m.de].nome} → <b>${ST[m.para].nome}</b>`);Object.entries(m.camp).forEach(([k,v])=>{const n={galpao:"galpão",loja:"loja",rot:"roteirização",agenda:"agenda",obs:"obs.",volume:"paletes",pbr:"PBR",chep:"CHEP",envio:"envio",rfInfo:"R.F."}[k]||k;parts.push(k==="rfInfo"?"R.F. informado ✓":`${n}: ${k==="agenda"||k==="rot"?br(v):esc(v===null?"—":v)||"—"}`);});return `<li><span class="mono"><b>${esc(m.l.carga)}</b></span><span>${parts.join(" · ")}</span></li>`;};
+  const linhaMud=(m)=>{const parts=[];if(m.histMudou&&m.para==null&&!Object.keys(m.camp).length)parts.push("histórico atualizado pela planilha");if(m.para!=null)parts.push(`${ST[m.de].nome} → <b>${ST[m.para].nome}</b>`);Object.entries(m.camp).forEach(([k,v])=>{const n={galpao:"galpão",loja:"loja",rot:"roteirização",agenda:"agenda",obs:"obs.",volume:"paletes",pbr:"PBR",chep:"CHEP",envio:"envio",rfInfo:"R.F."}[k]||k;parts.push(k==="rfInfo"?(m.rfJa?"dia do R.F.: "+br(v.dia):"R.F. informado ✓ em "+br(v.dia)):`${n}: ${k==="agenda"||k==="rot"?br(v):esc(v===null?"—":v)||"—"}`);});return `<li><span class="mono"><b>${esc(m.l.carga)}</b></span><span>${parts.join(" · ")}</span></li>`;};
   let corpo;
   if(p.fase==="previa"){
     corpo=`<div class="sumg"><div><span class="label">Novas</span><b>${p.novas.length}</b></div><div><span class="label">Com mudanças</span><b>${p.mud.length}</b></div><div><span class="label">Sem mudança</span><b>${p.iguais.length}</b></div><div><span class="label">Problemas</span><b style="color:var(${ne?"--crit":nw?"--warn":"--ok"})">${p.probs.length}</b></div></div>
@@ -1910,7 +1926,7 @@ async function gravarImp(){
     hist,criadoEm:now,atualizadoEm:now,atualizadoPor:por}));});
   const muds=p.mud.slice(); if(p.aplicarAtras) p.atras.forEach(a=>{const m=muds.find(x=>x.id===a.id); if(m) m.para=a.para; else muds.push({id:a.id,l:a.l,camp:{},de:a.de,para:a.para,baseHist:a.baseHist});});
   muds.forEach(m=>tarefas.push(()=>{const d=docs.get(m.id)||{};const ent=[];const patch={...m.camp};
-    Object.keys(m.camp).forEach(k=>{if(k==="rfInfo")ent.push({tipo:"rf",de:false,para:true,em,reg:now,por,origem:"base"});else if(k!=="obs")ent.push({tipo:k,de:d[k]==null?"":d[k],para:m.camp[k]==null?"":m.camp[k],em,reg:now,por,origem:"base"});});
+    Object.keys(m.camp).forEach(k=>{if(k==="rfInfo"){if(d.rfInfo&&d.rfInfo.em)ent.push({tipo:"rfdia",de:rfDiaDe(d.rfInfo),para:m.camp.rfInfo.dia,em,reg:now,por,origem:"base"});else ent.push({tipo:"rf",de:false,para:true,em,reg:now,por,origem:"base"});}else if(k!=="obs")ent.push({tipo:k,de:d[k]==null?"":d[k],para:m.camp[k]==null?"":m.camp[k],em,reg:now,por,origem:"base"});});
     if(m.para!=null){patch.status=m.para;ent.push({tipo:"status",de:m.de,para:m.para,em,reg:now,por,origem:"base"});}
     patch.hist=(m.baseHist||(Array.isArray(d.hist)?d.hist:[])).concat(ent);if(m.para==null&&m.histMudou){const u=ultimoStatus(m.baseHist);if(u!=null)patch.status=u;}patch.atualizadoEm=now;patch.atualizadoPor=por;
     return db.collection("cargas").doc(m.id).update(patch);}));
@@ -1941,9 +1957,8 @@ function renderCfg(){
   $("#modal").innerHTML=`<div class="modal"><div class="mbox" role="dialog" aria-modal="true" aria-label="Regras do painel"><div class="mw">
     <div class="dhead"><div><span class="label">Regras do painel</span><h2>Prazos e feriados</h2><span class="small">${modoLocal?"Ficam salvas neste navegador e vão junto na planilha ao clicar em Baixar base.":"Valem para toda a equipe. Só quem edita o painel pode mudar."}</span></div><button class="x" data-mclose="1" aria-label="Fechar">×</button></div>
     <div class="fgrid"><label>Dias úteis antes da agenda para entrar no cronograma<input type="number" id="cfreg" min="1" max="20" value="${esc(c.regraDias)}"></label>
-    <label>Informar R.F. quantos dias úteis antes do cronograma<input type="number" id="cfrf" min="0" max="10" value="${esc(c.rfDias)}"></label>
     <label>Alerta "Atenção" quando faltam até (dias úteis)<input type="number" id="cfat" min="0" max="10" value="${esc(c.atencaoDias)}"></label></div>
-    <label class="ck cfter"><input type="checkbox" id="cfter" ${c.regraTerca?"checked":""}><span><b>Regra da terça</b>: carga com agenda na terça tem o R.F. informado <b>na sexta anterior</b> (não antes; se a sexta for feriado, no dia útil anterior) e entra no cronograma até o <b>sábado</b>, para produzir no fim de semana e expedir na segunda.</span></label>
+    <label class="ck cfter"><input type="checkbox" id="cfter" ${c.regraTerca?"checked":""}><span><b>Regra da terça</b>: carga com agenda na terça entra no cronograma até o <b>sábado</b>, para produzir no fim de semana e expedir na segunda.</span></label>
     <label style="display:grid;gap:4px;font-size:13px;font-weight:600">Feriados e dias sem expediente, além dos nacionais (um por linha, dd/mm/aaaa)<textarea id="cffer" style="min-height:120px;font-family:var(--mono)">${esc(c.fer)}</textarea></label>
     <span class="small">Já incluídos automaticamente: Confraternização, Sexta-feira Santa, Tiradentes, Dia do Trabalho, Independência, N. Sra. Aparecida, Finados, Proclamação da República, Consciência Negra e Natal. Carnaval e Corpus Christi não estão incluídos.</span>
     <div class="mfoot"><span class="toast err" id="cfmsg"></span><button class="btn ghost" data-mclose="1">Cancelar</button><button class="btn" id="cfsave">Salvar regras</button></div>
@@ -1960,7 +1975,7 @@ async function mudarRegra(delta,campo){
   catch(e){ salvandoRegra=false; setToast(erroTxt(e),true); }
 }
 async function salvarCfg(){
-  const reg=parseInt($("#cfreg").value,10), at=parseInt($("#cfat").value,10), rfd=parseInt($("#cfrf").value,10);
+  const reg=parseInt($("#cfreg").value,10), at=parseInt($("#cfat").value,10), rfd=cfg.rfDias;
   const linhas=$("#cffer").value.split(/\n|;|,/).map(s=>s.trim()).filter(Boolean); const fer=[]; const bad=[];
   linhas.forEach(s=>{const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);if(m)fer.push(iso(+m[3],+m[2],+m[1]));else bad.push(s);});
   if(!(reg>=1&&reg<=20)||!(at>=0&&at<=10)||!(rfd>=0&&rfd<=10)||bad.length){$("#cfmsg").textContent=bad.length?"Data inválida: "+bad[0]:"Confira os números.";return;}
@@ -2042,6 +2057,7 @@ document.addEventListener("change",e=>{
   if(t.name==="dst"&&dForm){dForm.status=t.value;document.querySelectorAll(".stopt").forEach(l=>l.classList.toggle("cur",l.querySelector("input").checked));return;}
   if(t.id==="kpimes"){kpiMes=t.value;render();return;}
   if(t.id==="lojasel"){lojaF=t.value;render();return;}
+  if(t.dataset&&t.dataset.rfdia){salvarRfDia(t.dataset.rfdia,t.value);return;}
   if(t.id==="bst"){bulkSt=t.value;return;}
   if(t.id==="bdt"){bulkData=t.value;return;}
   if(t.id==="bag"){bulkAgenda=t.value;return;}

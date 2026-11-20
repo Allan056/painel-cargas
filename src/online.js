@@ -33,7 +33,7 @@ const CAMPOS={envio:v=>String(v==null?"":v),carga:v=>String(v==null?"":v),galpao
   volume:v=>(v===null||v===undefined||v==="")?null:(Number.isFinite(Number(v))?Math.round(Number(v)):null),
   pbr:v=>(v===null||v===undefined||v==="")?null:(Number.isFinite(Number(v))&&Number(v)>=0?Math.round(Number(v)):null),
   chep:v=>(v===null||v===undefined||v==="")?null:(Number.isFinite(Number(v))&&Number(v)>=0?Math.round(Number(v)):null),
-  rfInfo:v=>v&&v.em?{em:String(v.em),por:v.por||null,porNome:v.porNome||""}:null,
+  rfInfo:v=>v&&v.em?{em:String(v.em),...(v.dia&&/^\d{4}-\d{2}-\d{2}$/.test(v.dia)?{dia:v.dia}:{}),por:v.por||null,porNome:v.porNome||""}:null,
   obs:v=>String(v==null?"":v),status:v=>Number(v),hist:v=>Array.isArray(v)?v:[]};
 function linhaDe(d,completa){
   const o={};
@@ -498,11 +498,11 @@ function criarExt(sb,info){
     <section class="sec"><h2>Lojas destino</h2><p class="small">Aparecem como sugestão no campo Loja destino da carga.</p>${chipLista("lojas",c.lojas)}${addLinha("lojas","Código (ex.: 558)",`<input type="text" name="nome" placeholder="Nome (opcional)" maxlength="60">`)}</section>
     <section class="sec"><h2>Galpões</h2><p class="small">Aparecem como sugestão no campo Galpão.</p>${chipLista("galpoes",c.galpoes)}${addLinha("galpoes","Novo galpão (ex.: G30)")}</section>
     <section class="sec"><h2>Tipos de ocorrência</h2><p class="small">Opções ao registrar uma ocorrência.</p>${chipLista("tiposOcorrencia",c.tiposOcorrencia)}${addLinha("tiposOcorrencia","Novo tipo")}</section>
-    <section class="sec"><h2>Regras do painel</h2><p class="small">Entrar no cronograma <b>${esc(g.regraDias??3)} dias úteis</b> antes da agenda · Informar R.F. <b>${esc(g.rfDias??1)} dia útil</b> antes do cronograma · <b>${(g.feriadosExtras||[]).length}</b> feriados locais cadastrados. Só você muda.</p><button class="btn ghost sm" data-regras>Editar regras e feriados</button></section>
+    <section class="sec"><h2>Regras do painel</h2><p class="small">Entrar no cronograma <b>${esc(g.regraDias??3)} dias úteis</b> antes da agenda · R.F. sem prazo (informe em qualquer dia antes do cronograma) · <b>${(g.feriadosExtras||[]).length}</b> feriados locais cadastrados. Só você muda.</p><button class="btn ghost sm" data-regras>Editar regras e feriados</button></section>
     </div>
     <section class="sec"><h2>E-mails automáticos</h2><p class="small">Saem sozinhos pelo servidor, até 15 minutos depois do horário escolhido, mesmo com o site fechado. Até 20 e-mails por envio; o plano gratuito do Brevo permite 300 e-mails por dia.</p>
       <div class="secgrid">
-      <form class="mail" data-mail="diario"><h3>Resumo do dia</h3><p class="small">O que vence no dia (informar R.F., entrar no cronograma, expedir), o que está atrasado e as ocorrências abertas.</p>
+      <form class="mail" data-mail="diario"><h3>Resumo do dia</h3><p class="small">O que vence no dia (entrar no cronograma, expedir), as cargas com R.F. pendente, o que está atrasado e as ocorrências abertas.</p>
         <label class="ck"><input type="checkbox" name="ativo" ${d.ativo?"checked":""}>Enviar o resumo diário</label>
         <div class="fgrid"><label>Horário<input type="time" name="hora" value="${esc(d.hora)}"></label><label class="ck" style="align-self:end"><input type="checkbox" name="fimDeSemana" ${d.fimDeSemana?"checked":""}>Também sábado e domingo</label></div>
         <label>Quem recebe (um e-mail por linha)<textarea name="destinatarios" rows="3">${esc((d.destinatarios||[]).join("\n"))}</textarea></label>
