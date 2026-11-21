@@ -44,7 +44,7 @@ A regra acordada com a operação é aplicada sozinha:
 | | Funcionalidade | O que faz |
 |---|---|---|
 | 🔐 | **Login e criação de conta** | Usuário e senha; conta nova só com o **código do time**; "esqueci minha senha" por e-mail |
-| 👥 | **Perfis de acesso** | **Administrador Master**, **Administrador** e **Visualizador**, com as regras aplicadas no próprio banco (RLS) |
+| 👥 | **Perfis e permissões** | **Master**, **Administrador**, **Operador**, **Visualizador** e **Personalizado**, com matriz de permissões editável, bloquear e excluir conta; tudo conferido no próprio banco (RLS e gatilhos) |
 | ⚡ | **Tempo real** | O que uma pessoa muda aparece na hora para todo mundo ("Ao vivo") |
 | 🏭 | **Cargas para produção** | Próximas cargas, colunas por etapa e visão por envio |
 | 📊 | **Cartões do topo** | Em produção, expedir hoje, atrasadas e próxima carga, clicáveis |
@@ -52,12 +52,17 @@ A regra acordada com a operação é aplicada sozinha:
 | 🧮 | **Datas automáticas** | Cronograma, R.F. e expedição em dias úteis, sem fins de semana e feriados |
 | 🚨 | **Alertas** | Fora do prazo, informar R.F. hoje, incluir hoje, expedir hoje, risco de atraso |
 | 🗓️ | **Calendário** | Semana e mês por galpão, com as **cargas conjugadas** (mesmo envio) destacadas |
-| 📈 | **Indicadores** | % no prazo do cronograma, % entregue na agenda e tempo médio por etapa |
-| 📥 | **Importação do WMS** | Lê o relatório do Infor WMS e avança o status sozinho, ignorando status operacionais |
+| 📈 | **Indicadores** | % no prazo do cronograma, % entregue na agenda, tempo por etapa, **OTIF de expedição** (6 meses), **motivos de atraso** e relatório do mês |
+| 💬 | **Comentários e motivo do atraso** | Recados da equipe em cada carga, em tempo real, e motivo informado nas cargas atrasadas |
+| 📺 | **Modo TV** | Tela cheia para monitor da operação, alternando Resumo e Agendadas |
+| 📥 | **Importação do WMS** | Lê o relatório do Infor WMS (abas Data e Detail): cria as cargas, avança a produção, traz unidades e os **detalhes da carga** (itens por SKU, corte e paletes arredondados para cima), conferindo os totais e os dois formatos de número |
+| 🏷️ | **Base de SKUs** | Código e descrição dos itens, atualizável a qualquer momento; a busca encontra cargas pelo SKU |
+| 📅 | **Agendar envio** | Um envio do Mercado Livre com uma ou mais cargas: agenda, prazos calculados na hora, juntar, reagendar ou tirar carga do envio |
+| 🟦 | **PBR e CHEP** | Informados quando a carga fica pronta, em lote, conferidos com os paletes do WMS |
 | ⚠️ | **Ocorrências** | Registro e resolução de problemas por carga, com autor e data |
 | 🕓 | **Histórico** | Toda alteração com data, hora e quem fez, gravada pelo banco (não dá para editar) |
 | 🗂️ | **Cadastro** | Equipes, funções, perfis, lojas, galpões, tipos de ocorrência e código do time |
-| ✉️ | **E-mails automáticos** | Resumo do dia (horário e destinatários editáveis) e relatório semanal de uso |
+| ✉️ | **E-mails automáticos** | Resumo do dia, relatório semanal de uso, **relatório mensal** (dia 1) e **alertas imediatos** de carga atrasada e nova ocorrência |
 | ✅ | **R.F. informado** | Marca na carga (ou em lote) quem informou o R.F. e quando; o alerta sai |
 | 📅 | **Regra da terça** | Agenda na terça: R.F. na sexta anterior e cronograma até o sábado da produção |
 | 📦 | **Paletes PBR** | Saldo de PBR enviados e não devolvidos, retornos, previsão com as cargas agendadas e alerta perto do limite (só o Administrador Master) |

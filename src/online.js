@@ -6,8 +6,21 @@
 "use strict";
 const CFG=window.PAINEL_SUPABASE||{};
 const CHAVE_CFG={"config/geral":"geral","meta/base":"meta_base"};
-const PERFIL_NOME={master:"Administrador Master",admin:"Administrador",leitura:"Visualizador"};
-const PERFIL_PODE={master:"Tudo: regras, perfis, cadastros, e-mails e código do time",admin:"Carregar base e WMS, mudar status e agenda, ocorrências",leitura:"Só visualiza, busca, baixa a base e copia o resumo"};
+const PERFIL_NOME={master:"Administrador Master",admin:"Administrador",operador:"Operador",leitura:"Visualizador",personalizado:"Personalizado"};
+/* permissões: cada perfil tem a sua lista (o Master pode tudo). O banco confere as mesmas regras antes de gravar. */
+const PERMS=[
+  ["Cargas",[["etapa","Mudar a etapa das cargas"],["rf","Marcar e desmarcar R.F. informado"],["editar","Editar os dados da carga (envio, galpão, agenda, paletes, observação)"],["comentar","Comentar nas cargas"],["motivo","Escolher o motivo de atraso"]]],
+  ["Base",[["base","Carregar a base (planilha e WMS) e excluir cargas"],["exportar","Baixar a base e exportar"]]],
+  ["Ocorrências",[["ocorrencia","Registrar e resolver ocorrências"],["alertas","Receber os alertas por e-mail"]]],
+  ["Controle",[["paletes","Ver e registrar paletes PBR"],["regras","Mudar regras, feriados e listas"]]]];
+const PERM_KEYS=PERMS.flatMap(([,l])=>l.map(x=>x[0]));
+const PERM_PADRAO={admin:Object.fromEntries(PERM_KEYS.map(k=>[k,true])),
+  operador:Object.fromEntries(PERM_KEYS.map(k=>[k,["etapa","rf","comentar","motivo","exportar","ocorrencia","alertas"].includes(k)])),
+  leitura:Object.fromEntries(PERM_KEYS.map(k=>[k,k==="exportar"]))};
+const PERM_SO_TELA=["exportar","alertas"];
+function permsDe(perfil,matriz,propria){ if(perfil==="master") return Object.fromEntries(PERM_KEYS.map(k=>[k,true]));
+  if(perfil==="personalizado") return Object.fromEntries(PERM_KEYS.map(k=>[k,!!(propria&&propria[k])]));
+  const m=Object.assign({},PERM_PADRAO[perfil]||{},(matriz||{})[perfil]||{}); return Object.fromEntries(PERM_KEYS.map(k=>[k,!!m[k]])); }
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const brA=s=>{if(!s)return "—";const [y,m,d]=String(s).slice(0,10).split("-");return d+"/"+m+"/"+y;};
 const dtHora=s=>{if(!s)return "—";const d=new Date(s);return d.toLocaleDateString("pt-BR")+" "+d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});};
@@ -24,7 +37,8 @@ function erroPerm(e){
 /* linha da tabela ↔ documento do painel */
 function docDe(r){
   return {envio:r.envio||"",carga:r.carga,galpao:r.galpao||"",loja:r.loja||"",rot:r.rot||"",agenda:r.agenda||"",
-    volume:(typeof r.volume==="number"?r.volume:null),pbr:(typeof r.pbr==="number"?r.pbr:null),chep:(typeof r.chep==="number"?r.chep:null),rfInfo:r.rf_info&&r.rf_info.em?r.rf_info:null,
+    volume:(typeof r.volume==="number"?r.volume:null),pbr:(typeof r.pbr==="number"?r.pbr:null),chep:(typeof r.chep==="number"?r.chep:null),rfInfo:r.rf_info&&r.rf_info.em?r.rf_info:null,motivoAtraso:r.motivo_atraso&&r.motivo_atraso.motivo?r.motivo_atraso:null,
+    unidades:(typeof r.unidades==="number"?r.unidades:null),itens:r.itens&&Array.isArray(r.itens.lista)?r.itens:null,
     obs:r.obs||"",status:(typeof r.status==="number"?r.status:1),
     hist:Array.isArray(r.hist)?r.hist:[],criadoEm:r.criado_em||"",atualizadoEm:r.atualizado_em||"",atualizadoPor:r.atualizado_por||null};
 }
@@ -34,11 +48,15 @@ const CAMPOS={envio:v=>String(v==null?"":v),carga:v=>String(v==null?"":v),galpao
   pbr:v=>(v===null||v===undefined||v==="")?null:(Number.isFinite(Number(v))&&Number(v)>=0?Math.round(Number(v)):null),
   chep:v=>(v===null||v===undefined||v==="")?null:(Number.isFinite(Number(v))&&Number(v)>=0?Math.round(Number(v)):null),
   rfInfo:v=>v&&v.em?{em:String(v.em),...(v.dia&&/^\d{4}-\d{2}-\d{2}$/.test(v.dia)?{dia:v.dia}:{}),por:v.por||null,porNome:v.porNome||""}:null,
+  motivoAtraso:v=>v&&v.motivo?{motivo:String(v.motivo).slice(0,80),texto:String(v.texto||"").slice(0,200),em:String(v.em||""),por:v.por||null,porNome:v.porNome||""}:null,
+  unidades:v=>(v===null||v===undefined||v==="")?null:(Number.isFinite(Number(v))&&Number(v)>=0?Math.round(Number(v)):null),
+  itens:v=>v&&Array.isArray(v.lista)?{em:String(v.em||"").slice(0,10),lista:v.lista.slice(0,500).map(x=>({l:String(x.l||"").slice(0,10),sku:String(x.sku||"").slice(0,30),ped:Math.round(Number(x.ped)||0),aj:Math.round(Number(x.aj)||0),p:x.p==null?null:Math.ceil(Number(x.p)||0)}))}:null,
   obs:v=>String(v==null?"":v),status:v=>Number(v),hist:v=>Array.isArray(v)?v:[]};
 function linhaDe(d,completa){
   const o={};
-  Object.keys(CAMPOS).forEach(k=>{ if(Object.prototype.hasOwnProperty.call(d,k)) o[k]=CAMPOS[k](d[k]); else if(completa) o[k]=CAMPOS[k](k==="status"?1:undefined); });
+  Object.keys(CAMPOS).forEach(k=>{ if(Object.prototype.hasOwnProperty.call(d,k)) o[k]=CAMPOS[k](d[k]); else if(completa&&k!=="motivoAtraso") o[k]=CAMPOS[k](k==="status"?1:undefined); });
   if("rfInfo" in o){o.rf_info=o.rfInfo;delete o.rfInfo;}
+  if("motivoAtraso" in o){o.motivo_atraso=o.motivoAtraso;delete o.motivoAtraso;}
   return o;
 }
 
@@ -129,7 +147,7 @@ async function contas(corpo,token){
   return j;
 }
 /* página de entrada: apresentação animada da operação + formulário */
-const LOGO_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 20 7.3v9.4L12 21.2 4 16.7V7.3z"/><path d="M4 7.3l8 4.6 8-4.6M12 11.9v9.3"/><circle cx="12" cy="11.9" r="1.6" fill="currentColor"/></svg>';
+const LOGO_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 5.5h11v10.5h-11z"/><path d="M13.5 9h4.2l3.3 3.6V16h-7.5"/><path d="M15.6 9v3.6H21"/><circle cx="6.5" cy="17.4" r="1.9" fill="#ffe600"/><circle cx="17" cy="17.4" r="1.9" fill="#ffe600"/></svg>';
 const REDE_SVG=`<svg class="rede" viewBox="0 0 560 250" role="img" aria-label="Cargas saindo dos galpões G10 e G20, passando pela expedição e chegando ao Mercado Livre">
   <defs><radialGradient id="rg" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#22d3ee" stop-opacity=".55"/><stop offset="1" stop-color="#22d3ee" stop-opacity="0"/></radialGradient>
   <linearGradient id="lg1" x1="0" x2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient><linearGradient id="lg2" x1="0" x2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#4ade80"/></linearGradient></defs>
@@ -140,19 +158,63 @@ const REDE_SVG=`<svg class="rede" viewBox="0 0 560 250" role="img" aria-label="C
   ${[["r1",.1],["r1",1.6],["r2",.8],["r2",2.4],["r3",.4],["r3",1.5],["r3",2.6]].map(([r,b])=>`<circle class="pk" r="3.6"><animateMotion dur="3.2s" begin="-${b}s" repeatCount="indefinite" rotate="auto"><mpath href="#${r}"/></animateMotion></circle>`).join("")}
   ${[[70,62,"G10","#a78bfa"],[70,188,"G20","#a78bfa"],[280,125,"Expedição","#22d3ee"],[490,125,"Mercado Livre","#4ade80"]].map(([x,y,t,c],i)=>`<g class="no"><circle cx="${x}" cy="${y}" r="26" fill="url(#rg)" opacity=".5"><animate attributeName="r" values="18;30;18" dur="3s" begin="${i*.5}s" repeatCount="indefinite"/></circle><circle cx="${x}" cy="${y}" r="9" fill="#060b14" stroke="${c}" stroke-width="2.5"/><circle cx="${x}" cy="${y}" r="3.5" fill="${c}"/><text x="${x}" y="${y+(y<100?-22:y>150?32:-22)}" text-anchor="middle">${t}</text></g>`).join("")}
 </svg>`;
+function cam3d(m,troca){
+  /* caminhão realista em caixas 3D; troca=true mistura Assaí → Mercado Livre por --skin */
+  const as=m!=="ml";
+  const mix=(a,b)=>troca?`color-mix(in srgb,${b} calc(var(--sk2,0)*100%),${a})`:(as?a:b);
+  const C={bau:mix("#004596","#ffe600"),bauT:mix("#1d5fb3","#fff27a"),bauR:mix("#003a80","#e0c800"),cab:mix("#eef1f6","#2d3277"),cabT:mix("#ffffff","#3a4196"),cabR:mix("#c8cfdc","#22275e"),fx:mix("#e8592a","#ffe600"),fb:mix("#e8592a","#2d3277")};
+  const bx=o=>`<div class="bx" style="--x:${o.x};--y:${o.y||0};--z:${o.z};--l:${o.l};--w:${o.w};--h:${o.h}">${["ft","fs","fb","fr","ff"].map(k=>`<i class="${k} ${(o.cl&&o.cl[k])||""}" style="--cor:${(o.c&&o.c[k])||o.cor||"#1b1e24"}">${(o.in&&o.in[k])||""}</i>`).join("")}</div>`;
+  const pt=(ox,oy,oz,h)=>`<div class="pt3" style="--ox:${ox};--oy:${oy};--oz:${oz}">${h}</div>`;
+  const rd=(cx,y)=>`<div class="rw" style="--cx:${cx};--yy:${y}"><div class="giro">${Array.from({length:18},(_,i)=>`<i class="tr" style="--a:${i*20}deg"></i>`).join("")}<i class="ld" style="--ly:0"></i><i class="ld" style="--ly:24"></i></div></div>`;
+  const sk=(esp)=>troca?`<i class="skin3 a" ${esp?'style="transform:scaleX(-1)"':""}><b class="lg3 la3"></b></i><i class="skin3 m" ${esp?'style="transform:scaleX(-1)"':""}><b class="lg3 lm3"></b></i>`:`<b class="lg3 ${as?"la3":"lm3"}" ${esp?'style="transform:scaleX(-1)"':""}></b>`;
+  const faixaB=`<i class="fx3" style="background:${C.fb}"></i>`;
+  const ladoCab=`<i class="porta3"></i><i class="fx3 c" style="background:${C.fx}"></i>`;
+  const esp=`<i class="scan3"></i>`;
+  let h="";
+  h+=pt(0,0,-70,bx({x:-6,y:18,z:20,l:452,w:88,h:14,cor:"#1b1e24"}));
+  h+=pt(-30,0,95,bx({x:0,y:0,z:36,l:300,w:124,h:150,cl:{fs:"costelas",fb:"costelas",ft:"costelas",fr:"portas"},c:{ft:C.bauT,fs:C.bau,fb:C.bau,fr:C.bauR,ff:C.bauR},in:{fs:sk(0)+faixaB+esp,fb:sk(1)+faixaB,ft:esp,fr:`<i class="lant3" style="left:8px"></i><i class="lant3" style="right:8px"></i><i class="ref3"></i>`}})
+     +bx({x:-4,y:2,z:24,l:6,w:120,h:12,cl:{fs:"cromo",ft:"cromo",fr:"cromo",fb:"cromo"}}));
+  h+=pt(140,0,40,bx({x:312,y:2,z:32,l:116,w:120,h:74,cl:{fs:"sombreado",fb:"sombreado"},c:{ft:C.cabT,fs:C.cab,fb:C.cab,fr:C.cabR,ff:C.cabR},in:{fs:ladoCab+esp,fb:ladoCab,ff:`<i class="grelha3"></i><i class="farol3" style="left:5%"></i><i class="farol3" style="right:5%"></i>`}})
+     +bx({x:312,y:6,z:106,l:96,w:112,h:58,cl:{fs:"sombreado",fb:"sombreado"},c:{ft:C.cabT,fs:C.cab,fb:C.cab,fr:C.cabR,ff:"#1a1f2c"},in:{fs:`<i class="jan3"></i>`+esp,fb:`<i class="jan3" style="inset:8px 30% 10px 8px"></i>`,ff:`<i class="pb3"></i>`}})
+     +bx({x:312,y:10,z:164,l:72,w:104,h:22,cl:{fs:"sombreado"},c:{ft:C.cabT,fs:C.cab,fb:C.cab,fr:C.cabR,ff:C.cabT}})
+     +bx({x:426,y:-2,z:22,l:12,w:128,h:26,cl:{fs:"cromo",ft:"cromo",ff:"cromo",fb:"cromo"}})
+     +bx({x:398,y:126,z:122,l:6,w:12,h:30,cor:"#15171c"})+bx({x:398,y:-14,z:122,l:6,w:12,h:30,cor:"#15171c"}));
+  h+=pt(40,60,-30,bx({x:318,y:124,z:32,l:46,w:10,h:26,cl:{fs:"cromo",ft:"cromo",ff:"cromo",fr:"cromo"}}));
+  [[62,-40],[124,-10],[372,110]].forEach(([x,o])=>{h+=pt(o,170,-50,rd(x,104))+pt(o,-170,-50,rd(x,-4));});
+  return h;
+}
+function cenaCaminhoes(modo){
+  /* quatro camadas com a mesma câmera: chão e estrada, postes do fundo, caminhões, postes da frente */
+  const cx=(c,x,l,h,z,dentro)=>`<div class="cx ${c}" style="--x:${x};--l:${l};--h:${h};--z:${z}"><i class="t"></i><i class="s">${dentro||""}</i><i class="r"></i></div>`;
+  const cam=m=>`<div class="cam cam-${m} c3d"><i class="sombra"></i><i class="rastro"></i><i class="farol"></i>${cam3d(m)}</div>`;
+  const xs=[];for(let x=-1920;x<=1920;x+=320)xs.push(x);
+  const poste=(x,y)=>`<div class="cx poste" style="--x:${x};--y:${y};--l:8;--w:8;--h:54;--z:0"><i class="t"></i><i class="s"></i><i class="r"></i></div>`;
+  const chao=Array.from({length:9},(_,i)=>`<div class="via" style="--vx:${-2160+i*480}"><i class="borda b1"></i><i class="borda b2"></i><i class="faixa"></i></div>`).join("");
+  return `<div class="cena ${modo||""}" aria-hidden="true"><div class="mundo">${chao}</div><div class="mundo">${cam("assai")}${cam("ml")}</div></div>`;
+}
+
+/* botão de olho nos campos de senha: mostra ou oculta o que foi digitado */
+const OLHO='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const OLHO_X='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.6 8.5 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+function poeOlhos(root){
+  root.querySelectorAll('input[type="password"]').forEach(inp=>{
+    if(inp.parentElement&&inp.parentElement.classList.contains("senhabox")) return;
+    const w=document.createElement("span"); w.className="senhabox"; inp.parentNode.insertBefore(w,inp); w.appendChild(inp);
+    const b=document.createElement("button"); b.type="button"; b.className="vsenha"; b.setAttribute("aria-label","Mostrar senha"); b.setAttribute("aria-pressed","false"); b.title="Mostrar senha"; b.innerHTML=OLHO;
+    b.addEventListener("click",e=>{e.preventDefault(); const ver=inp.type==="password"; inp.type=ver?"text":"password";
+      b.setAttribute("aria-pressed",String(ver)); const t=ver?"Ocultar senha":"Mostrar senha"; b.setAttribute("aria-label",t); b.title=t; b.innerHTML=ver?OLHO_X:OLHO;
+      const n=inp.value.length; inp.focus(); try{inp.setSelectionRange(n,n);}catch(_){}});
+    w.appendChild(b);
+  });
+}
 function telaLogin(sb,msgInicial){
   return new Promise(res=>{
     let el=document.getElementById("login"); if(!el){el=document.createElement("div");el.id="login";document.body.appendChild(el);}
     let modo="entrar", aviso=msgInicial||"", ok="", erros=0;
     const desenhar=()=>{
-      el.innerHTML=`<div class="land"><section class="lhero">
-        <div class="lbrand"><span class="logo">${LOGO_SVG}</span><span>Painel de Cargas</span><span class="lchip"><i></i>Canais Digitais</span></div>
-        <h1>Cada carga, do roteiro à agenda, em tempo real.</h1>
-        <p class="lsub">A torre de controle dos envios para o Mercado Livre: R.F., cronograma, produção e expedição no mesmo lugar, atualizado para todo o time.</p>
-        ${REDE_SVG}
-      </section>
+      el.innerHTML=`${cenaCaminhoes("noite holo")}<div class="land">
       <form class="lg" autocomplete="on" novalidate>
-        <div class="label">Acesso do time</div>
+        <div class="lbrand"><span class="logo">${LOGO_SVG}</span><span>Painel de Cargas</span><span class="lequipe">Canais Digitais</span></div>
         <h2>${modo==="cadastrar"?"Criar conta":modo==="recuperar"?"Nova senha":"Entrar"}</h2>
         <div class="seg lgtab" role="tablist"><button type="button" data-m="entrar" aria-pressed="${modo==="entrar"}">Entrar</button><button type="button" data-m="cadastrar" aria-pressed="${modo==="cadastrar"}">Criar conta</button></div>
         <p class="small">${modo==="recuperar"?"Informe seu usuário. Enviamos um link para o e-mail cadastrado para você criar uma nova senha.":modo==="cadastrar"?"Peça o código do time ao Administrador Master.":"Entre com seu usuário e senha."}</p>
@@ -166,6 +228,7 @@ function telaLogin(sb,msgInicial){
         ${modo==="cadastrar"?`<p class="small">Toda conta nova começa como Visualizador. O Administrador Master libera quem pode alterar.</p>`:""}
         ${erros>=2&&modo!=="recuperar"?`<p class="lalerta" role="alert"><b>Atenção:</b> ${erros>=5?"o acesso pode estar bloqueado por 15 minutos.":`depois de 5 tentativas erradas o acesso fica bloqueado por 15 minutos. Já foram ${erros}.`} Se esqueceu a senha, use <b>Esqueci minha senha</b>.</p>`:""}
       </form></div>`;
+      poeOlhos(el);
       const f=el.querySelector("form");
       el.querySelectorAll("[data-m]").forEach(b=>b.addEventListener("click",()=>{const u=f.usuario.value;modo=b.dataset.m;aviso="";ok="";desenhar();el.querySelector("form").usuario.value=u;}));
       setTimeout(()=>{const x=f.usuario.value?(f.senha||f.usuario):f.usuario;x.focus();},30);
@@ -199,7 +262,8 @@ function telaNovaSenha(sb,hash){
       <label>Nova senha (mínimo de 8 caracteres)<input type="password" name="s1" autocomplete="new-password" minlength="8" required></label>
       <label>Repita a nova senha<input type="password" name="s2" autocomplete="new-password" minlength="8" required></label>
       <div class="lgmsg" role="alert"></div><button class="btn" type="submit">Salvar e entrar</button></form>`;
-    const f=el.querySelector("form"), msg=f.querySelector(".lgmsg"), bt=f.querySelector("button");
+    poeOlhos(el);
+    const f=el.querySelector("form"), msg=f.querySelector(".lgmsg"), bt=f.querySelector('button[type="submit"]');
     f.s1.focus();
     f.addEventListener("submit",async ev=>{ev.preventDefault();
       if(f.s1.value.length<8){msg.textContent="A senha precisa ter pelo menos 8 caracteres.";return;}
@@ -224,7 +288,7 @@ function trocarSenha(sb){
   const j=janela("Trocar senha",`<form class="jform" novalidate><label>Nova senha (mínimo de 8 caracteres)<input type="password" name="s1" autocomplete="new-password" minlength="8"></label>
     <label>Repita a nova senha<input type="password" name="s2" autocomplete="new-password" minlength="8"></label>
     <div class="lgmsg" role="alert"></div><div class="mfoot"><button type="button" class="btn ghost" data-jx>Cancelar</button><button class="btn" type="submit">Salvar senha</button></div></form>`);
-  j.el.querySelectorAll("[data-jx]").forEach(b=>b.onclick=j.fechar);
+  j.el.querySelectorAll("[data-jx]").forEach(b=>b.onclick=j.fechar); poeOlhos(j.el);
   const f=j.el.querySelector("form"), msg=f.querySelector(".lgmsg"); f.s1.focus();
   f.addEventListener("submit",async ev=>{ev.preventDefault();
     if(f.s1.value.length<8){msg.textContent="A senha precisa ter pelo menos 8 caracteres.";return;}
@@ -260,12 +324,12 @@ function valorTxt(campo,v){
 }
 
 function criarExt(sb,info){
-  const eu=info.uid, master=info.master, pode=info.pode;
+  const eu=info.uid, master=info.master, pode=info.pode, podePal=info.podePal||info.master;
   const E={ocs:[],ocsOk:false,perfis:[],perfisOk:false,hist:[],histOk:false,histDias:7,histPessoa:"",histAlvo:"",
     ocFiltro:"abertas",ocForm:null,resolvendo:null,cad:null,resumo:null,cfgOk:false,msg:{},
     pal:{mov:[],arq:[],cfg:null,ok:false,filtro:"todos",verTodos:false,cfgAberta:false},online:[]};
   const raiz={}; let pendente=new Set();
-  const cadastros=()=>Object.assign({equipes:[],funcoes:[],lojas:[],galpoes:[],tiposOcorrencia:["Outros"]},E.cad||{});
+  const cadastros=()=>Object.assign({equipes:[],funcoes:[],lojas:[],galpoes:[],tiposOcorrencia:["Outros"],motivosAtraso:["Falta de produto","Atraso na produção","Transporte indisponível","Agenda do Mercado Livre","Nota fiscal ou documentação","Outro"]},E.cad||{});
   const redesenhar=v=>{ if(!raiz[v]||!raiz[v].isConnected) return;
     const a=document.activeElement; if(a&&raiz[v].contains(a)&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)){pendente.add(v);return;}
     desenhar(v); };
@@ -274,16 +338,16 @@ function criarExt(sb,info){
 
   async function carregarOcs(){const {data,error}=await sb.from("ocorrencias").select("*").order("dia",{ascending:false}).order("criado_em",{ascending:false}).limit(3000);
     if(!error){E.ocs=data||[];E.ocsOk=true;} redesenhar("ocorrencias"); API().rerender&&API().rerender();}
-  async function carregarPerfis(){const {data,error}=await sb.from("perfis").select("id,usuario,perfil,equipe,funcao,criado_em").order("usuario");
+  async function carregarPerfis(){const {data,error}=await sb.from("perfis").select("id,usuario,perfil,equipe,funcao,criado_em,bloqueado,permissoes").order("usuario");
     if(!error){E.perfis=data||[];E.perfisOk=true;} redesenhar("cadastro"); redesenhar("historico");}
   async function carregarHist(){const desde=new Date(Date.now()-E.histDias*864e5).toISOString();
     const {data,error}=await sb.from("historico").select("*").gte("em",desde).order("em",{ascending:false}).limit(3000);
     if(!error){E.hist=data||[];E.histOk=true;} redesenhar("historico");}
-  async function carregarCfg(){const {data,error}=await sb.from("cargas_config").select("chave,valor").in("chave",["cadastros","resumo","paletes"]);
-    if(!error){(data||[]).forEach(r=>{if(r.chave==="cadastros")E.cad=r.valor||{};if(r.chave==="resumo")E.resumo=r.valor||{};if(r.chave==="paletes")E.pal.cfg=r.valor||{};});E.cfgOk=true;}
+  async function carregarCfg(){const {data,error}=await sb.from("cargas_config").select("chave,valor").in("chave",["cadastros","resumo","paletes","permissoes"]);
+    if(!error){(data||[]).forEach(r=>{if(r.chave==="cadastros")E.cad=r.valor||{};if(r.chave==="resumo")E.resumo=r.valor||{};if(r.chave==="paletes")E.pal.cfg=r.valor||{};if(r.chave==="permissoes")E.perms=r.valor||{};});E.cfgOk=true;}
     redesenhar("cadastro"); redesenhar("ocorrencias"); carregarPaletes();}
   async function carregarPaletes(){
-    if(!master) return;
+    if(!podePal) return;
     const corte=palCfg().corte;
     const [a,b]=await Promise.all([sb.from("paletes_mov").select("*").order("dia").order("criado_em"),
       sb.from("cargas").select("id,carga,envio,agenda,pbr,chep,status,arquivado_em").not("arquivado_em","is",null).gte("agenda",corte)]);
@@ -292,17 +356,19 @@ function criarExt(sb,info){
   carregarOcs(); carregarPerfis(); carregarCfg();
 
   sb.channel("painel-ext")
+    .on("postgres_changes",{event:"*",schema:"public",table:"comentarios"},pl=>{const id=(pl.new&&pl.new.carga_id)||(pl.old&&pl.old.carga_id);if(E.ouveCom)E.ouveCom(id);try{window.dispatchEvent(new CustomEvent("painel-comentarios",{detail:id}));}catch(_){}})
     .on("postgres_changes",{event:"*",schema:"public",table:"ocorrencias"},pl=>{
       if(pl.eventType==="DELETE"){E.ocs=E.ocs.filter(o=>o.id!==(pl.old&&pl.old.id));}
       else if(pl.new){const i=E.ocs.findIndex(o=>o.id===pl.new.id); if(i>=0)E.ocs[i]=pl.new; else E.ocs.unshift(pl.new);}
       redesenhar("ocorrencias"); API().rerender&&API().rerender();})
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"historico"},pl=>{ if(pl.new&&E.histOk){E.hist.unshift(pl.new); redesenhar("historico");} })
     .on("postgres_changes",{event:"*",schema:"public",table:"perfis"},()=>carregarPerfis())
-    .on("postgres_changes",{event:"*",schema:"public",table:"paletes_mov"},()=>{if(master)carregarPaletes();})
+    .on("postgres_changes",{event:"*",schema:"public",table:"paletes_mov"},()=>{if(podePal)carregarPaletes();})
     .on("postgres_changes",{event:"*",schema:"public",table:"cargas_config"},pl=>{ const r=pl.new; if(!r) return;
       if(r.chave==="cadastros"){E.cad=r.valor||{};redesenhar("cadastro");redesenhar("ocorrencias");}
       if(r.chave==="resumo"){E.resumo=r.valor||{};redesenhar("cadastro");}
       if(r.chave==="paletes"){E.pal.cfg=r.valor||{};redesenhar("paletes");API().rerender&&API().rerender();}
+      if(r.chave==="permissoes"){E.perms=r.valor||{};redesenhar("cadastro");}
       if(r.chave==="geral") redesenhar("cadastro"); })
     .subscribe();
 
@@ -311,7 +377,7 @@ function criarExt(sb,info){
   const corDe=n=>{let h=0;for(const c of String(n))h=(h*31+c.charCodeAt(0))>>>0;return ["#2f6fdc","#0f8f8a","#7a4fd0","#c2255c","#d9480f","#2b8a3e","#5f3dc4","#1864ab"][h%8];};
   function presencaHtml(){const outros=E.online.filter(p=>p.uid!==eu);
     if(!outros.length) return "";
-    return `<span class="on">${outros.length===1?"também online":outros.length+" online"}</span>`+outros.slice(0,6).map(p=>`<span class="av" style="--c:${corDe(p.nome)}" title="${esc(p.nome)} está com o painel aberto">${esc(iniciais(p.nome))}</span>`).join("")+(outros.length>6?`<span class="av" style="--c:#5b6a7d">+${outros.length-6}</span>`:"");}
+    return `<span class="on">${outros.length===1?"mais 1 pessoa online":"mais "+outros.length+" pessoas online"}</span>`+outros.slice(0,6).map(p=>`<span class="av" style="--c:${corDe(p.nome)}" title="${esc(p.nome)} está com o painel aberto">${esc(iniciais(p.nome))}</span>`).join("")+(outros.length>6?`<span class="av" style="--c:#5b6a7d">+${outros.length-6}</span>`:"");}
   try{
     const pres=sb.channel("presenca-painel",{config:{presence:{key:eu}}});
     pres.on("presence",{event:"sync"},()=>{const st=pres.presenceState()||{};const vistos=new Map();
@@ -362,12 +428,12 @@ function criarExt(sb,info){
     const lista=(API().cargas?API().cargas():[]).map(r=>`<option value="${esc(r.carga)}">${esc(r.envio?"envio "+r.envio:"")}</option>`).join("");
     return `<form class="ocform" data-ocform novalidate><h3>Registrar ocorrência</h3>
       <div class="fgrid">
-        <label>Carga<input type="text" name="carga" list="ocl-cargas" value="${esc(f.carga||"")}" inputmode="numeric" placeholder="nº da carga"><datalist id="ocl-cargas">${lista}</datalist></label>
-        <label>Envio<input type="text" name="envio" value="${esc(f.envio||"")}" inputmode="numeric" placeholder="preenchido pela carga"></label>
+        <label>Carga<input type="text" name="carga" list="ocl-cargas" value="${esc(f.carga||"")}" inputmode="numeric" placeholder="Ex.: 13009783"><datalist id="ocl-cargas">${lista}</datalist></label>
+        <label>Envio<input type="text" name="envio" value="${esc(f.envio||"")}" inputmode="numeric" placeholder="Preenchido ao escolher a carga"></label>
         <label>Tipo<select name="tipo">${tipos.map(t=>`<option ${f.tipo===t?"selected":""}>${esc(t)}</option>`).join("")}</select></label>
         <label>Dia<input type="date" name="dia" value="${esc(f.dia||hojeIso())}" max="${hojeIso()}"></label>
       </div>
-      <label>Descrição<textarea name="descricao" placeholder="O que aconteceu?">${esc(f.descricao||"")}</textarea></label>
+      <label>Descrição<textarea name="descricao" placeholder="Ex.: palete quebrado na descarga">${esc(f.descricao||"")}</textarea></label>
       <div class="msg" role="alert">${esc(E.msg.oc||"")}</div>
       <div class="mfoot"><button type="button" class="btn ghost" data-occancel>Cancelar</button><button class="btn" type="submit">Registrar</button></div></form>`;
   }
@@ -381,6 +447,28 @@ function criarExt(sb,info){
       ${resolv?`<form class="ocres" data-ocresform="${esc(o.id)}"><label>Como foi resolvido?<textarea name="solucao" placeholder="Ex.: reagendado no portal para 14/11"></textarea></label><div class="msg" role="alert">${esc(E.msg.res||"")}</div><div class="mfoot"><button type="button" class="btn ghost sm" data-ocrescancel>Cancelar</button><button class="btn sm" type="submit">Marcar como resolvida</button></div></form>`:""}
       <div class="ocacts">${r?`<button class="btn ghost sm" data-open="${esc(r.id)}">Abrir carga</button>`:""}${pode&&o.status==="aberta"&&!resolv?`<button class="btn sm" data-ocres="${esc(o.id)}">Resolver</button>`:""}${pode&&o.status==="resolvida"?`<button class="btn ghost sm" data-ocreab="${esc(o.id)}">Reabrir</button>`:""}${master?`<button class="btn danger sm" data-ocdel="${esc(o.id)}">Excluir</button>`:""}</div></article>`;
   }
+  const alertasCfg=()=>Object.assign({ativo:false,atrasada:true,ocorrencia:true,extras:[]},(E.resumo||{}).alertas||{});
+  async function carregarAlertasHist(){const {data,error}=await sb.from("alertas_enviados").select("*").order("enviado_em",{ascending:false}).limit(15);
+    E.alHist=error?{erro:error.message}:(data||[]); desenhar("ocorrencias");}
+  function vAlertas(){
+    const c=E.alRasc||alertasCfg();
+    const quem=(E.perfis||[]).filter(p=>!p.bloqueado&&permsDe(p.perfil,E.perms,p.permissoes).alertas).map(p=>p.usuario);
+    if(!E.alAberto) return `<div class="alresumo"><span class="small">Alertas por e-mail: <b>${c.ativo?"ligados":"desligados"}</b>${c.ativo?` · ${[c.atrasada?"carga atrasada":"",c.ocorrencia?"nova ocorrência":""].filter(Boolean).join(" e ")||"nenhum tipo marcado"} · ${quem.length+c.extras.length} destinatário${quem.length+c.extras.length===1?"":"s"}`:""}</span><button class="btn ghost sm" data-alabrir aria-expanded="false">Configurar alertas</button></div>`;
+    const h=E.alHist;
+    return `<section class="sec alcfg" aria-label="Alertas por e-mail"><div class="alhd"><h2>Alertas por e-mail</h2><button class="btn ghost sm" data-alfechar aria-expanded="true">Fechar</button></div>
+      <p class="small">Avisa por e-mail na hora em que algo sai do normal, sem esperar o resumo das 7h.</p>
+      <label class="chk"><input type="checkbox" data-alc="ativo" ${c.ativo?"checked":""}> Ligar os alertas</label>
+      <fieldset class="altipos" ${c.ativo?"":"disabled"}><legend class="small">Quando avisar</legend>
+        <label class="chk"><input type="checkbox" data-alc="atrasada" ${c.atrasada?"checked":""}> Carga ficou atrasada (expedição ou entrega) <span class="small">· conferido de hora em hora, um aviso por carga</span></label>
+        <label class="chk"><input type="checkbox" data-alc="ocorrencia" ${c.ocorrencia?"checked":""}> Nova ocorrência registrada <span class="small">· na hora</span></label></fieldset>
+      <div class="alquem"><span class="label">Quem recebe</span>
+        <p class="small" style="margin:4px 0 8px">Pessoas com a permissão <b>Receber os alertas por e-mail</b> (Cadastro → Permissões): ${quem.length?quem.map(esc).join(", "):"<b>ninguém ainda</b>"}.</p>
+        <label><span>Outros e-mails <span class="small">(separados por vírgula)</span></span><input type="text" data-alc="extras" value="${esc(c.extras.join(", "))}" placeholder="Ex.: supervisor@empresa.com.br" autocomplete="off" spellcheck="false"></label></div>
+      <div class="msg" role="status">${esc(E.msg.al||"")}</div>
+      <div class="mfoot"><button class="btn ghost sm" data-alteste>Enviar teste para mim</button><button class="btn sm" data-alsalvar>Salvar alertas</button></div>
+      <div class="alhist"><span class="label">Últimos alertas enviados</span>${h===undefined?`<p class="small">Carregando…</p>`:h.erro?`<p class="small">Não foi possível carregar: ${esc(h.erro)}</p>`:h.length?`<ul class="docl">${h.map(a=>`<li><b>${a.tipo==="ocorrencia"?"Ocorrência":a.tipo==="atrasada"?"Carga atrasada":esc(a.tipo)}</b>${a.carga?` · carga <span class="mono">${esc(a.carga)}</span>`:""} · ${dtHora(a.enviado_em)}<div class="small">para ${esc((a.para||[]).join(", ")||"—")}</div></li>`).join("")}</ul>`:`<p class="small">Nenhum alerta enviado ainda.</p>`}</div>
+    </section>`;
+  }
   function vOcorrencias(){
     if(!E.ocsOk) return `<p class="small">Carregando as ocorrências…</p>`;
     const q=busca(), ab=E.ocs.filter(o=>o.status==="aberta").length;
@@ -388,6 +476,7 @@ function criarExt(sb,info){
     return `<div class="exbar"><div class="chips">${[["abertas",`Abertas (${ab})`],["resolvidas","Resolvidas"],["todas","Todas"]].map(([k,n])=>`<button class="chip" data-ocf="${k}" aria-pressed="${E.ocFiltro===k}">${n}</button>`).join("")}</div>
       <span class="sp"></span>${pode&&!E.ocForm?`<button class="btn" data-ocnova>+ Registrar ocorrência</button>`:""}</div>
       ${E.ocForm?formOc():""}
+      ${master?vAlertas():""}
       ${l.length?`<div class="oclist">${l.map(cardOc).join("")}</div>`:`<p class="vazio">Nenhuma ocorrência ${E.ocFiltro==="abertas"?"aberta":E.ocFiltro==="resolvidas"?"resolvida":""}${q?" para esta busca":""}.</p>`}`;
   }
   async function gravarOc(f){
@@ -447,9 +536,9 @@ function criarExt(sb,info){
     </div>
     ${p.semPal.length?`<div class="notice">${p.semPal.length===1?"1 carga":p.semPal.length+" cargas"} com agenda a partir de ${brA(c.corte)} ainda sem PBR e CHEP: ${p.semPal.slice(0,12).map(m=>`<button class="lnk" data-open="${esc(m.id)}">${esc(m.carga)}</button>`).join(", ")}. Sem isso, o saldo fica menor do que o real.</div>`:""}
     <div class="secgrid">
-      ${master?`<form class="sec ocform" data-palret novalidate><h2>Registrar retorno</h2><p class="small">Quando os paletes voltarem do Mercado Livre. Só o PBR entra no saldo.</p>
+      ${podePal?`<form class="sec ocform" data-palret novalidate><h2>Registrar retorno</h2><p class="small">Quando os paletes voltarem do Mercado Livre. Só o PBR entra no saldo.</p>
         <div class="fgrid"><label>Dia do retorno<input type="date" name="dia" value="${hojeIso()}" max="${hojeIso()}"></label><label>PBR devolvidos<input type="number" name="pbr" min="0" step="1" inputmode="numeric" placeholder="0"></label>
-        <label>CHEP devolvidos (opcional)<input type="number" name="chep" min="0" step="1" inputmode="numeric" placeholder="0"></label><label>Observação<input type="text" name="obs" maxlength="200" placeholder="ex.: coleta no CD"></label></div>
+        <label>CHEP devolvidos (opcional)<input type="number" name="chep" min="0" step="1" inputmode="numeric" placeholder="0"></label><label>Observação<input type="text" name="obs" maxlength="200" placeholder="Ex.: coleta no CD"></label></div>
         <div class="msg" role="alert">${esc(E.msg.pal||"")}</div><div class="mfoot"><button class="btn" type="submit">Registrar retorno</button></div></form>`:""}
       <section class="sec"><h2>Por mês</h2><div class="palleg"><span style="--c:var(--accent)">enviados</span><span style="--c:var(--ok)">devolvidos</span><span style="--c:transparent">número = saldo no fim do mês</span></div>
         <div class="palmes">${meses.map(([k,x])=>`<div class="m"><b>${mesTxt(k)}</b><div class="b e" title="${x.env} enviados"><i style="width:${Math.round(100*x.env/maxM)}%"></i></div><div class="b r" title="${x.ret} devolvidos"><i style="width:${Math.round(100*x.ret/maxM)}%"></i></div><span class="mono">${x.ac==null?"—":fmt(x.ac)}</span></div>`).join("")||`<p class="small">Sem movimentos.</p>`}</div></section>
@@ -481,25 +570,23 @@ function criarExt(sb,info){
     const g=(API().cfg&&API().cfg())||{};
     const nEq=e=>E.perfis.filter(p=>p.equipe===e).length, nFn=f=>E.perfis.filter(p=>p.funcao===f).length;
     const sel=(lista,val,attr)=>`<select ${attr}><option value="">—</option>${lista.map(x=>`<option ${x===val?"selected":""}>${esc(x)}</option>`).join("")}${val&&!lista.includes(val)?`<option selected>${esc(val)}</option>`:""}</select>`;
-    return `<p class="small">Só você, Administrador Master, vê esta aba. Tudo o que muda aqui fica registrado no Histórico.</p>
-    <section class="sec"><h2>Equipe e perfis</h2><p class="small">Toda conta nova entra como <b>Visualizador</b>. Você escolhe quem passa a <b>Administrador</b>.</p>
-      <div class="tablebox"><table class="t cadt"><thead><tr><th>Pessoa</th><th>Perfil</th><th>Equipe</th><th>Função</th><th>O que pode fazer</th></tr></thead><tbody>
-      ${E.perfis.map(p=>`<tr><td><b>${esc(p.usuario)}</b>${p.id===eu?' <span class="ctag mini">você</span>':""}</td>
-        <td>${p.perfil==="master"?"<b>Administrador Master</b>":`<select data-pperfil="${esc(p.id)}" aria-label="Perfil de ${esc(p.usuario)}">${["admin","leitura"].map(n=>`<option value="${n}" ${p.perfil===n?"selected":""}>${PERFIL_NOME[n]}</option>`).join("")}</select>`}</td>
-        <td>${sel(c.equipes,p.equipe||"",`data-pequipe="${esc(p.id)}" aria-label="Equipe de ${esc(p.usuario)}"`)}</td>
-        <td>${sel(c.funcoes,p.funcao||"",`data-pfuncao="${esc(p.id)}" aria-label="Função de ${esc(p.usuario)}"`)}</td>
-        <td class="small">${esc(PERFIL_PODE[p.perfil]||"")}</td></tr>`).join("")}</tbody></table></div>
-      <div class="msg" role="status">${esc(E.msg.perfil||"")}</div></section>
-    <section class="sec"><h2>Código do time <span class="ctag mini">criação de conta</span></h2><p class="small">É o código que a pessoa digita para criar a conta. Ao trocar, o antigo para de funcionar (quem já tem conta continua entrando).</p>
-      <form class="acrow" data-codigo><input type="text" name="v" placeholder="NOVO CÓDIGO" maxlength="40" autocomplete="off" style="text-transform:uppercase"><button class="btn sm" type="submit">Trocar código</button></form><div class="msg" role="status">${esc(E.msg.codigo||"")}</div></section>
-    <div class="secgrid">
+    const aba=E.cadAba||"pessoas";
+    const ABAS=[["pessoas","Pessoas"],["permissoes","Permissões"],["listas","Listas"],["regras","Regras e e-mails"]];
+    return `<div class="cadabas" role="tablist" aria-label="Partes do cadastro">${ABAS.map(([k,n])=>`<button type="button" role="tab" class="chip" data-cadaba="${k}" aria-selected="${aba===k}" aria-pressed="${aba===k}">${n}</button>`).join("")}</div>
+    <p class="small cadnota">Só você, Administrador Master, vê esta tela. Tudo o que muda aqui fica registrado no Histórico.</p>
+    ${aba==="pessoas"?vPessoas(c,sel):""}
+    ${aba==="permissoes"?vPermissoes():""}
+    ${aba==="listas"?`<div class="secgrid">
     <section class="sec"><h2>Equipes</h2><p class="small">Times do setor. Cada pessoa pode ter uma equipe.</p>${chipLista("equipes",c.equipes,nEq)}${addLinha("equipes","Nova equipe")}</section>
     <section class="sec"><h2>Funções</h2><p class="small">Cargos do setor (Analista, Gestor…).</p>${chipLista("funcoes",c.funcoes,nFn)}${addLinha("funcoes","Nova função")}</section>
-    <section class="sec"><h2>Lojas destino</h2><p class="small">Aparecem como sugestão no campo Loja destino da carga.</p>${chipLista("lojas",c.lojas)}${addLinha("lojas","Código (ex.: 558)",`<input type="text" name="nome" placeholder="Nome (opcional)" maxlength="60">`)}</section>
+    <section class="sec"><h2>Lojas destino</h2><p class="small">Aparecem como sugestão no campo Loja destino da carga.</p>${chipLista("lojas",c.lojas)}${addLinha("lojas","Código (ex.: 558)",`<input type="text" name="nome" placeholder="Ex.: Maria (opcional)" maxlength="60">`)}</section>
     <section class="sec"><h2>Galpões</h2><p class="small">Aparecem como sugestão no campo Galpão.</p>${chipLista("galpoes",c.galpoes)}${addLinha("galpoes","Novo galpão (ex.: G30)")}</section>
     <section class="sec"><h2>Tipos de ocorrência</h2><p class="small">Opções ao registrar uma ocorrência.</p>${chipLista("tiposOcorrencia",c.tiposOcorrencia)}${addLinha("tiposOcorrencia","Novo tipo")}</section>
-    <section class="sec"><h2>Regras do painel</h2><p class="small">Entrar no cronograma <b>${esc(g.regraDias??3)} dias úteis</b> antes da agenda · R.F. sem prazo (informe em qualquer dia antes do cronograma) · <b>${(g.feriadosExtras||[]).length}</b> feriados locais cadastrados. Só você muda.</p><button class="btn ghost sm" data-regras>Editar regras e feriados</button></section>
-    </div>
+    <section class="sec"><h2>Motivos de atraso</h2><p class="small">Opções ao informar por que uma carga atrasou.</p>${chipLista("motivosAtraso",c.motivosAtraso)}${addLinha("motivosAtraso","Ex.: falta de produto")}</section>
+    </div>`:""}
+    ${aba==="regras"?`<section class="sec"><h2>Código do time <span class="ctag mini">criação de conta</span></h2><p class="small">É o código que a pessoa digita para criar a conta. Ao trocar, o antigo para de funcionar (quem já tem conta continua entrando).</p>
+      <form class="acrow" data-codigo><input type="text" name="v" placeholder="Ex.: TIME2026" maxlength="40" autocomplete="off" style="text-transform:uppercase"><button class="btn sm" type="submit">Trocar código</button></form><div class="msg" role="status">${esc(E.msg.codigo||"")}</div></section>
+    <section class="sec"><h2>Regras do painel</h2><p class="small">Entrar no cronograma <b>${esc(g.regraDias??3)} dias úteis</b> antes da agenda · R.F. sem prazo (informe em qualquer dia antes do cronograma) · <b>${(g.feriadosExtras||[]).length}</b> feriados locais cadastrados. Muda quem tem a permissão de regras.</p><button class="btn ghost sm" data-regras>Editar regras e feriados</button></section>
     <section class="sec"><h2>E-mails automáticos</h2><p class="small">Saem sozinhos pelo servidor, até 15 minutos depois do horário escolhido, mesmo com o site fechado. Até 20 e-mails por envio; o plano gratuito do Brevo permite 300 e-mails por dia.</p>
       <div class="secgrid">
       <form class="mail" data-mail="diario"><h3>Resumo do dia</h3><p class="small">O que vence no dia (entrar no cronograma, expedir), as cargas com R.F. pendente, o que está atrasado e as ocorrências abertas.</p>
@@ -518,13 +605,64 @@ function criarExt(sb,info){
       </div></section>
     <section class="sec"><h2>Microsoft Teams</h2>
       <p class="small">Manda o resumo das 7h e os alertas de paletes para um canal do Teams. Como ligar: no canal, clique em <b>•••</b> → <b>Workflows</b> → <b>“Post to a channel when a webhook request is received”</b>, escolha a equipe e o canal, e copie o endereço que aparece no final. Cole aqui embaixo.</p>
-      <p><b>${rs.teamsConfigurado?"Teams conectado ✓":"Teams ainda não conectado"}</b>${rs.teamsConfigurado?" · o endereço fica guardado no servidor e não aparece na tela.":""}</p>
+      <p><b>${rs.teamsConfigurado?"Teams conectado":"Teams ainda não conectado"}</b>${rs.teamsConfigurado?" · o endereço fica guardado no servidor e não aparece na tela.":""}</p>
       <form class="acrow" data-teams><input type="text" name="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="${rs.teamsConfigurado?"Cole um novo endereço para trocar":"Cole aqui o endereço do Workflow"}" style="max-width:none"><button class="btn sm" type="submit">Salvar</button></form>
       <div class="acrow"><label class="ck"><input type="checkbox" data-teamsflag="diario" ${(rs.teams||{}).diario!==false?"checked":""}>Resumo do dia no canal</label><label class="ck"><input type="checkbox" data-teamsflag="paletes" ${(rs.teams||{}).paletes!==false?"checked":""}>Alertas de paletes no canal</label></div>
       <div class="msg" role="status">${esc(E.msg.teams||"")}</div>
       ${rs.teamsConfigurado?`<div class="mfoot"><button class="btn ghost sm" data-teamsrem>Desconectar</button><button class="btn sm" data-teamsteste>Enviar teste no canal</button></div>`:""}</section>
-    <section class="sec"><h2>Arquivamento automático</h2><p class="small">Toda madrugada o servidor tira do painel as cargas <b>Expedidas, Entregues ou Canceladas</b> com agenda há mais de <b>60 dias</b>. Elas continuam guardadas no banco e são apagadas de vez depois de <b>12 meses</b>, junto com o histórico e as ocorrências resolvidas desse período. Se uma carga arquivada voltar numa base, ela reaparece no painel.</p></section>`;
+    <section class="sec"><h2>Arquivamento automático</h2><p class="small">Toda madrugada o servidor tira do painel as cargas <b>Expedidas, Entregues ou Canceladas</b> com agenda há mais de <b>60 dias</b>. Elas continuam guardadas no banco e são apagadas de vez depois de <b>12 meses</b>, junto com o histórico e as ocorrências resolvidas desse período. Se uma carga arquivada voltar numa base, ela reaparece no painel.</p></section>`:""}`;
   }
+  /* ---------- Cadastro → Pessoas ---------- */
+  const OK_SVG='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  function vPessoas(c,sel){
+    const f=E.pesFiltro||"todas", nAt=E.perfis.filter(p=>!p.bloqueado).length, nBl=E.perfis.length-nAt;
+    const lista=E.perfis.filter(p=>f==="todas"||(f==="bloqueadas"?p.bloqueado:!p.bloqueado));
+    const editor=p=>{const atual=E.persRasc||permsDe(p.perfil==="personalizado"?"personalizado":p.perfil,E.perms,p.permissoes);
+      return `<tr class="prow"><td colspan="6"><form class="perspan" data-pperform="${esc(p.id)}"><h3>Permissões de ${esc(p.usuario)}</h3><p class="small">Marque o que esta pessoa pode fazer. Ela passa a ter o perfil <b>Personalizado</b>.</p>
+        <div class="persgrid">${PERMS.map(([g,l])=>`<fieldset><legend>${g}</legend>${l.map(([k,n])=>`<label class="ck"><input type="checkbox" name="${k}" ${atual[k]?"checked":""}>${esc(n)}</label>`).join("")}</fieldset>`).join("")}</div>
+        <div class="mfoot"><button type="button" class="btn ghost sm" data-pperscancel>Cancelar</button><button class="btn sm" type="submit">Salvar permissões</button></div></form></td></tr>`;};
+    const excl=p=>`<tr class="prow"><td colspan="6"><form class="exclpan" data-pexclform="${esc(p.id)}"><h3>Excluir a conta de ${esc(p.usuario)}?</h3>
+        <p class="small">A pessoa perde o acesso na hora e o usuário fica livre para outra conta. O histórico continua mostrando o nome dela nas mudanças antigas. Não dá para desfazer.</p>
+        <label><span>Para confirmar, digite <b>${esc(p.usuario)}</b></span><input type="text" name="nome" autocomplete="off" spellcheck="false"></label>
+        <div class="msg" role="alert">${esc(E.msg.excl||"")}</div>
+        <div class="mfoot"><button type="button" class="btn ghost sm" data-pexclcancel>Cancelar</button><button class="btn danger sm" type="submit">Excluir conta</button></div></form></td></tr>`;
+    return `<section class="sec"><div class="och"><h2>Pessoas</h2><span class="sp"></span>
+      <div class="chips" role="group" aria-label="Filtrar pessoas">${[["todas","Todas",E.perfis.length],["ativas","Ativas",nAt],["bloqueadas","Bloqueadas",nBl]].map(([k,n,q])=>`<button type="button" class="chip" data-pesf="${k}" aria-pressed="${f===k}">${n} (${q})</button>`).join("")}</div></div>
+      <p class="small">Conta nova entra como <b>Visualizador</b>. Troque o perfil aqui; o que cada perfil pode fazer fica em <b>Permissões</b>.</p>
+      <div class="tablebox"><table class="t pest"><thead><tr><th>Pessoa</th><th>Perfil</th><th>Equipe</th><th>Função</th><th>Situação</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody>
+      ${lista.length?lista.map(p=>`<tr class="${p.bloqueado?"blq":""}"><td><span class="pav2" aria-hidden="true">${esc(iniciais(p.usuario))}</span><b>${esc(p.usuario)}</b>${p.id===eu?' <span class="ctag mini">você</span>':""}</td>
+        <td>${p.perfil==="master"?"<b>Administrador Master</b>":`<select data-pperfil="${esc(p.id)}" aria-label="Perfil de ${esc(p.usuario)}">${["admin","operador","leitura","personalizado"].map(n=>`<option value="${n}" ${p.perfil===n?"selected":""}>${PERFIL_NOME[n]}</option>`).join("")}</select>`}</td>
+        <td>${sel(c.equipes,p.equipe||"",`data-pequipe="${esc(p.id)}" aria-label="Equipe de ${esc(p.usuario)}"`)}</td>
+        <td>${sel(c.funcoes,p.funcao||"",`data-pfuncao="${esc(p.id)}" aria-label="Função de ${esc(p.usuario)}"`)}</td>
+        <td><span class="sit ${p.bloqueado?"blq":"ok"}">${p.bloqueado?"Bloqueada":"Ativa"}</span></td>
+        <td class="pacoes">${p.perfil==="master"||p.id===eu?"":`<details class="mais pmenu"><summary aria-label="Ações para ${esc(p.usuario)}"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg></summary><div class="maismenu" role="menu">
+          <button role="menuitem" data-ppers="${esc(p.id)}">Personalizar permissões</button>
+          ${p.bloqueado?`<button role="menuitem" data-pbloq="${esc(p.id)}" data-v="0">Desbloquear acesso</button>`:`<button role="menuitem" data-pbloq="${esc(p.id)}" data-v="1">Bloquear acesso</button>`}
+          <button role="menuitem" class="perigo" data-pexcl="${esc(p.id)}">Excluir conta</button></div></details>`}</td></tr>
+        ${E.personalizando===p.id?editor(p):""}${E.excluindo===p.id?excl(p):""}`).join(""):`<tr><td colspan="6" class="small">Ninguém nesta lista.</td></tr>`}</tbody></table></div>
+      <div class="msg" role="status">${esc(E.msg.perfil||"")}</div></section>`;
+  }
+  /* ---------- Cadastro → Permissões (matriz) ---------- */
+  function vPermissoes(){
+    const cols=[["admin","Administrador"],["operador","Operador"],["leitura","Visualizador"]];
+    const m=Object.fromEntries(cols.map(([k])=>[k,permsDe(k,E.perms)]));
+    const qtd=k=>E.perfis.filter(p=>p.perfil===k).length;
+    return `<section class="sec"><h2>Permissões por perfil</h2>
+      <p class="small">Clique para liberar ou tirar uma permissão. Vale na hora para todos que têm o perfil, e o banco de dados confere a mesma regra antes de gravar. O Master pode tudo e não muda. Quem é <b>Personalizado</b> tem as permissões ajustadas pessoa por pessoa, em <b>Pessoas</b>.</p>
+      <div class="tablebox"><table class="t permt"><thead><tr><th>Permissão</th>${cols.map(([k,n])=>`<th>${n}<span class="small">${qtd(k)} ${qtd(k)===1?"pessoa":"pessoas"}</span></th>`).join("")}<th>Master<span class="small">sempre</span></th></tr></thead><tbody>
+      ${PERMS.map(([g,l])=>`<tr class="pgrp"><th colspan="${cols.length+2}" scope="colgroup">${g}</th></tr>${l.map(([k,n])=>`<tr><td>${esc(n)}${PERM_SO_TELA.includes(k)?' <span class="small">· só na tela</span>':""}</td>
+        ${cols.map(([pk,pn])=>`<td><button type="button" class="pchk ${m[pk][k]?"on":""}" data-perm="${k}" data-perfil="${pk}" aria-pressed="${m[pk][k]}" aria-label="${pn}: ${esc(n)}">${m[pk][k]?OK_SVG:""}</button></td>`).join("")}
+        <td><span class="pchk on trav" role="img" aria-label="Master: sempre pode">${OK_SVG}</span></td></tr>`).join("")}`).join("")}
+      </tbody></table></div>
+      <p class="small">“Só na tela”: baixar a base e receber alertas não passam por gravação no banco, então o painel esconde a opção de quem não tem a permissão.</p>
+      <div class="msg" role="status">${esc(E.msg.perms||"")}</div></section>`;
+  }
+  async function salvarPerms(novo){
+    const {error}=await sb.from("cargas_config").upsert({chave:"permissoes",valor:novo},{onConflict:"chave"});
+    if(error){E.msg.perms="Não foi possível salvar: "+error.message;desenhar("cadastro");return;}
+    E.perms=novo; E.msg.perms="Salvo. Vale na hora para todos com esse perfil."; desenhar("cadastro");
+  }
+  async function contasMaster(corpo){const {data:{session}}=await sb.auth.getSession(); return contas(corpo,session&&session.access_token);}
   async function salvarCad(novo){
     const {error}=await sb.from("cargas_config").update({valor:novo}).eq("chave","cadastros");
     if(error){API().toast&&API().toast("Não foi possível salvar o cadastro: "+error.message,true);return false;}
@@ -538,17 +676,40 @@ function criarExt(sb,info){
 
   /* ---------- eventos das abas ---------- */
   function ligar(v,el){
+    const alMuda=e=>{const t=e.target; if(!t.dataset||!t.dataset.alc) return; const c=E.alRasc||(E.alRasc=alertasCfg());
+      const k=t.dataset.alc; c[k]=k==="extras"?t.value.split(/[,;\s]+/).map(x=>x.trim()).filter(Boolean):t.checked;
+      if(k==="ativo"){const fs=el.querySelector(".altipos"); if(fs) fs.disabled=!t.checked;}};
+    el.addEventListener("input",alMuda); el.addEventListener("change",alMuda);
     el.addEventListener("click",async e=>{
       const t=e.target;
       if(t.closest("[data-hcopiar]")){copiarHist();return;}
       const ocf=t.closest("[data-ocf]"); if(ocf){E.ocFiltro=ocf.dataset.ocf;desenhar("ocorrencias");return;}
       if(t.closest("[data-ocnova]")){E.ocForm={dia:hojeIso(),tipo:cadastros().tiposOcorrencia[0]};E.msg.oc="";desenhar("ocorrencias");return;}
+      if(t.closest("[data-alabrir]")){E.alAberto=true;E.alRasc=null;E.msg.al="";if(E.alHist===undefined)carregarAlertasHist();desenhar("ocorrencias");return;}
+      if(t.closest("[data-alfechar]")){E.alAberto=false;E.alRasc=null;desenhar("ocorrencias");return;}
+      if(t.closest("[data-alsalvar]")){const c=Object.assign({},alertasCfg(),E.alRasc||{}); const bad=c.extras.filter(x=>!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+        if(bad.length){E.msg.al="Confira o e-mail: "+bad.join(", ");desenhar("ocorrencias");return;}
+        const atual=Object.assign({diario:{},semanal:{}},E.resumo||{}), novo={...atual,alertas:{ativo:!!c.ativo,atrasada:!!c.atrasada,ocorrencia:!!c.ocorrencia,extras:c.extras}};
+        const {error}=await sb.from("cargas_config").update({valor:novo}).eq("chave","resumo"); E.msg.al=error?"Não foi possível salvar: "+error.message:"Alertas salvos.";
+        if(!error){E.resumo=novo;E.alRasc=null;} desenhar("ocorrencias");return;}
+      if(t.closest("[data-alteste]")){E.msg.al="Enviando teste…";desenhar("ocorrencias");try{const j=await fnResumo({acao:"teste",tipo:"alertas"});E.msg.al="Teste enviado para "+((j&&j.para)||[]).join(", ")+".";}catch(err){E.msg.al="Não foi possível: "+err.message;}desenhar("ocorrencias");return;}
       if(t.closest("[data-occancel]")){E.ocForm=null;E.msg.oc="";desenhar("ocorrencias");return;}
       const rs=t.closest("[data-ocres]"); if(rs){E.resolvendo=rs.dataset.ocres;E.msg.res="";desenhar("ocorrencias");const ta=el.querySelector('[data-ocresform] textarea');if(ta)ta.focus();return;}
       if(t.closest("[data-ocrescancel]")){E.resolvendo=null;desenhar("ocorrencias");return;}
       const rb=t.closest("[data-ocreab]"); if(rb){const {error}=await sb.from("ocorrencias").update({status:"aberta"}).eq("id",rb.dataset.ocreab);if(error)API().toast&&API().toast("Não foi possível reabrir: "+error.message,true);else carregarOcs();return;}
       const dl=t.closest("[data-ocdel]"); if(dl){ if(dl.dataset.conf!=="1"){dl.dataset.conf="1";dl.textContent="Confirmar exclusão";return;}
         const {error}=await sb.from("ocorrencias").delete().eq("id",dl.dataset.ocdel);if(error)API().toast&&API().toast("Não foi possível excluir: "+error.message,true);else carregarOcs();return;}
+      const ca=t.closest("[data-cadaba]"); if(ca){E.cadAba=ca.dataset.cadaba;E.personalizando=null;E.excluindo=null;desenhar("cadastro");return;}
+      const pf2=t.closest("[data-pesf]"); if(pf2){E.pesFiltro=pf2.dataset.pesf;desenhar("cadastro");return;}
+      const pp=t.closest("[data-ppers]"); if(pp){E.personalizando=pp.dataset.ppers;E.excluindo=null;E.persRasc=null;desenhar("cadastro");return;}
+      if(t.closest("[data-pperscancel]")){E.personalizando=null;desenhar("cadastro");return;}
+      const pb=t.closest("[data-pbloq]"); if(pb){const alvo=pb.dataset.pbloq, valor=pb.dataset.v==="1", nome=(E.perfis.find(p=>p.id===alvo)||{}).usuario||"";
+        E.msg.perfil=valor?"Bloqueando…":"Desbloqueando…";desenhar("cadastro");
+        try{await contasMaster({acao:"bloquear",alvo,valor});E.msg.perfil=valor?`${nome} está bloqueada. Ela saiu do painel e não consegue entrar.`:`${nome} pode entrar de novo.`;}catch(err){E.msg.perfil=err.message;}
+        carregarPerfis();return;}
+      const px=t.closest("[data-pexcl]"); if(px){E.excluindo=px.dataset.pexcl;E.personalizando=null;E.msg.excl="";desenhar("cadastro");const i=el.querySelector('[data-pexclform] input');if(i)i.focus();return;}
+      if(t.closest("[data-pexclcancel]")){E.excluindo=null;desenhar("cadastro");return;}
+      const pm=t.closest("[data-perm]"); if(pm){const k=pm.dataset.perm, pk=pm.dataset.perfil; const atual=Object.assign({},E.perms||{}); const linha=permsDe(pk,atual); linha[k]=!linha[k]; atual[pk]=linha; salvarPerms(atual);return;}
       const cd=t.closest("[data-cdel]"); if(cd){const c=cadastros(),k=cd.dataset.cdel,l=(c[k]||[]).slice();l.splice(Number(cd.dataset.i),1);salvarCad({...c,[k]:l});return;}
       if(t.closest("[data-regras]")){API().abrirRegras&&API().abrirRegras();return;}
       const pf=t.closest("[data-palf]"); if(pf){E.pal.filtro=pf.dataset.palf;desenhar("paletes");return;}
@@ -570,7 +731,8 @@ function criarExt(sb,info){
       if(t.matches("[data-hpessoa]")){E.histPessoa=t.value;desenhar("historico");return;}
       if(t.matches("[data-halvo]")){E.histAlvo=t.value;desenhar("historico");return;}
       if(t.matches("[data-pperfil]")){t.disabled=true;const {error}=await sb.rpc("definir_perfil",{alvo:t.dataset.pperfil,novo:t.value});
-        E.msg.perfil=error?"Não foi possível salvar: "+error.message:"Perfil salvo. A mudança vale na hora para a pessoa."; carregarPerfis();return;}
+        E.msg.perfil=error?"Não foi possível salvar: "+error.message:t.value==="personalizado"?"Perfil Personalizado. Marque abaixo o que a pessoa pode fazer.":"Perfil salvo. A mudança vale na hora para a pessoa.";
+        if(!error&&t.value==="personalizado"){E.personalizando=t.dataset.pperfil;E.persRasc=null;} carregarPerfis();return;}
       if(t.matches("[data-pequipe],[data-pfuncao]")){const id=t.dataset.pequipe||t.dataset.pfuncao;const p=E.perfis.find(x=>x.id===id)||{};
         const eq=t.dataset.pequipe?t.value:(p.equipe||""), fn=t.dataset.pfuncao?t.value:(p.funcao||"");
         const {error}=await sb.rpc("definir_equipe_funcao",{alvo:id,nova_equipe:eq,nova_funcao:fn});
@@ -607,6 +769,14 @@ function criarExt(sb,info){
         if(k==="lojas"){ if(l.some(x=>String(x.codigo)===v)) return; l.push({codigo:v,nome:(f.nome&&f.nome.value.trim())||""}); }
         else { if(l.some(x=>norm(x)===norm(v))) return; l.push(v); }
         salvarCad({...c,[k]:l});return;}
+      if(f.matches("[data-pperform]")){const alvo=f.dataset.pperform, perms=Object.fromEntries(PERM_KEYS.map(k=>[k,!!(f[k]&&f[k].checked)]));
+        const {error}=await sb.rpc("definir_permissoes",{alvo,perms});
+        E.msg.perfil=error?"Não foi possível salvar: "+error.message:"Permissões salvas. A pessoa agora é Personalizado.";
+        if(!error)E.personalizando=null; carregarPerfis();return;}
+      if(f.matches("[data-pexclform]")){const alvo=f.dataset.pexclform, p=E.perfis.find(x=>x.id===alvo)||{};
+        if(f.nome.value.trim().toLowerCase()!==String(p.usuario||"").trim().toLowerCase()){E.msg.excl="O nome digitado não confere.";desenhar("cadastro");return;}
+        try{await contasMaster({acao:"excluir",alvo});E.excluindo=null;E.msg.perfil=`A conta de ${p.usuario} foi excluída.`;}catch(err){E.msg.excl=err.message;desenhar("cadastro");return;}
+        carregarPerfis();return;}
       if(f.matches("[data-codigo]")){const v=f.v.value.trim(); if(v.length<4){E.msg.codigo="Use pelo menos 4 caracteres.";desenhar("cadastro");return;}
         try{const {data:{session}}=await sb.auth.getSession(); await contas({acao:"alterar_codigo",novo:v},session&&session.access_token); E.msg.codigo="Código trocado. Novo código: "+v.toUpperCase();}
         catch(err){E.msg.codigo=err.message;} desenhar("cadastro");return;}
@@ -636,12 +806,22 @@ function criarExt(sb,info){
       if(digitando(raiz[v])){ if(foco&&foco.isConnected){try{foco.focus({preventScroll:true});}catch(_){}} } else desenhar(v);
     },
     paletesCfg:()=>palCfg(),
-    paletesSaldo(){if(!master)return null;const p=calcPal(); return p?{saldo:p.saldo,limite:p.c.limite,aviso:p.c.aviso,nivel:p.nivel,proj:p.proj}:null;},
+    paletesSaldo(){if(!podePal)return null;const p=calcPal(); return p?{saldo:p.saldo,limite:p.c.limite,aviso:p.c.aviso,nivel:p.nivel,proj:p.proj}:null;},
     presencaHtml,
     ocAbertas(){const s=new Set();E.ocs.forEach(o=>{if(o.status==="aberta"&&o.carga)s.add(String(o.carga));});return s;},
     ocAbertasN(){return E.ocs.filter(o=>o.status==="aberta").length;},
     ocDaCarga(carga){return ocsDe(carga);},
     cadastros,
+    podeComentar:()=>!!info.podeCom,
+    async comentarios(cargaId){const {data,error}=await sb.from("comentarios").select("*").eq("carga_id",cargaId).order("criado_em",{ascending:true}).limit(200); if(error) throw error; return data||[];},
+    async comentar(r,texto){const {error}=await sb.from("comentarios").insert({carga_id:r.id,carga:r.carga,envio:r.envio||"",texto:String(texto).slice(0,1000)}); if(error) throw error;},
+    async apagarComentario(id){const {error}=await sb.from("comentarios").delete().eq("id",id); if(error) throw error;},
+    souEu:id=>id===eu, souMaster:()=>master,
+    ouvirComentarios(fn){E.ouveCom=fn;},
+    mensalCfg:()=>Object.assign({ativo:false,hora:"07:00",destinatarios:[]},(E.resumo||{}).mensal||{}),
+    async salvarMensal(m){const atual=Object.assign({diario:{},semanal:{}},E.resumo||{}); const novo={...atual,mensal:m};
+      const {error}=await sb.from("cargas_config").update({valor:novo}).eq("chave","resumo"); if(error) throw error; E.resumo=novo;},
+    async testeMensal(mes){return fnResumo({acao:"teste",tipo:"mensal",mes});},
     novaOcorrencia(r){E.ocForm={carga:r.carga,envio:r.envio,dia:hojeIso(),tipo:cadastros().tiposOcorrencia[0]};E.msg.oc="";E.ocFiltro="abertas";
       if(location.hash!=="#ocorrencias") location.hash="#ocorrencias"; else redesenhar("ocorrencias");}
   };
@@ -658,25 +838,40 @@ async function conectar(){
   for(;;){
     if(!session) session=await telaLogin(sb,aviso);
     const uid=session.user.id;
-    const {data:pf,error}=await sb.from("perfis").select("id,usuario,perfil,equipe,funcao").eq("id",uid).maybeSingle();
+    const {data:pf,error}=await sb.from("perfis").select("id,usuario,perfil,equipe,funcao,bloqueado,permissoes").eq("id",uid).maybeSingle();
+    if(!error&&pf&&pf.bloqueado){ try{await sb.auth.signOut();}catch(_){} try{localStorage.removeItem("painel-cargas-auth");}catch(_){} session=null; aviso="Seu acesso está bloqueado. Fale com o Administrador Master."; continue; }
     if(!error&&pf){
       sb.auth.onAuthStateChange((ev)=>{ if(ev==="SIGNED_OUT") location.reload(); });
       const store=criarStore(sb);
-      const nivel=pf.perfil, master=nivel==="master", pode=master||nivel==="admin";
+      const nivel=pf.perfil, master=nivel==="master";
+      const {data:pm}=await sb.from("cargas_config").select("valor").eq("chave","permissoes").maybeSingle();
+      const meus=permsDe(nivel,pm&&pm.valor,pf.permissoes), podeK=k=>!!meus[k];
+      const pode=["etapa","rf","editar","base","ocorrencia"].some(podeK);
       /* se o Master mudar o meu perfil, o painel recarrega com as novas permissões */
-      sb.channel("meu-perfil").on("postgres_changes",{event:"UPDATE",schema:"public",table:"perfis",filter:"id=eq."+uid},pl=>{ if(pl.new&&pl.new.perfil&&pl.new.perfil!==nivel) location.reload(); }).subscribe();
+      sb.channel("meu-perfil").on("postgres_changes",{event:"UPDATE",schema:"public",table:"perfis",filter:"id=eq."+uid},pl=>{ const n=pl.new||{};
+        if(n.bloqueado){ sb.auth.signOut().catch(()=>{}); try{localStorage.removeItem("painel-cargas-auth");}catch(_){} location.reload(); return; }
+        if((n.perfil&&n.perfil!==nivel)||JSON.stringify(n.permissoes||null)!==JSON.stringify(pf.permissoes||null)) location.reload(); })
+        .on("postgres_changes",{event:"UPDATE",schema:"public",table:"cargas_config",filter:"chave=eq.permissoes"},()=>{ if(!master) location.reload(); }).subscribe();
       const nomes={};
       const user={
         id:async()=>uid,
         can:async()=>pode,
         canEdit:async()=>master,
         profiles:async ids=>{const falta=ids.filter(i=>i&&!nomes[i]);
-          if(falta.length){const {data}=await sb.from("perfis").select("id,usuario").in("id",falta);(data||[]).forEach(r=>{nomes[r.id]=r.usuario;});}
+          if(falta.length){const {data}=await sb.from("perfis").select("id,usuario").in("id",falta);(data||[]).forEach(r=>{nomes[r.id]=r.usuario;});
+            const ainda=falta.filter(i=>!nomes[i]); if(ainda.length){const {data:ex}=await sb.from("contas_excluidas").select("id,usuario").in("id",ainda);(ex||[]).forEach(r=>{nomes[r.id]=r.usuario+" (conta excluída)";});}}
           const o={};ids.forEach(i=>{if(nomes[i])o[i]={name:nomes[i]};});return o;}
       };
-      window.PAINEL_EXT=criarExt(sb,{uid,master,pode,nome:pf.usuario});
-      return {db:store.db,user,uid,nome:pf.usuario,perfil:nivel,master,nivel,nivelNome:PERFIL_NOME[nivel]||nivel,podeAlterar:pode,admin:master,
-        equipe:pf.equipe||"",funcao:pf.funcao||"",aoVivo:store.aoVivo,
+      window.PAINEL_EXT=criarExt(sb,{uid,master,pode:podeK("ocorrencia"),podePal:podeK("paletes"),podeCom:podeK("comentar"),nome:pf.usuario});
+      /* base de SKUs: código → descrição (carrega em páginas de 1000, que é o limite do Supabase por consulta) */
+      const skus=new Map();
+      const carregarSkus=async()=>{ const n=new Map(); for(let de=0;de<20000;de+=1000){ const {data,error}=await sb.from("skus").select("sku,descricao").order("sku").range(de,de+999); if(error) return; (data||[]).forEach(x=>n.set(x.sku,x.descricao)); if(!data||data.length<1000) break; }
+        skus.clear(); n.forEach((v,k)=>skus.set(k,v)); try{window.dispatchEvent(new Event("painel-skus"));}catch(_){} };
+      carregarSkus();
+      let skuT=null; sb.channel("skus").on("postgres_changes",{event:"*",schema:"public",table:"skus"},()=>{clearTimeout(skuT);skuT=setTimeout(carregarSkus,1500);}).subscribe();
+      const salvarSkus=async lista=>{ for(let i=0;i<lista.length;i+=500){ const {error}=await sb.from("skus").upsert(lista.slice(i,i+500).map(x=>({sku:String(x.sku).slice(0,30),descricao:String(x.desc).slice(0,200)})),{onConflict:"sku"}); if(error) throw error; } await carregarSkus(); };
+      return {db:store.db,skus:()=>skus,salvarSkus,user,uid,nome:pf.usuario,perfil:nivel,master,nivel,nivelNome:PERFIL_NOME[nivel]||nivel,podeAlterar:pode,admin:master,pode:podeK,
+        equipe:pf.equipe||"",funcao:pf.funcao||"",aoVivo:store.aoVivo,email:(session.user&&session.user.email)||"",criadoEm:(session.user&&session.user.created_at)||"",
         trocarSenha:()=>trocarSenha(sb),
         sair:async()=>{try{await sb.auth.signOut();}catch(_){} try{localStorage.removeItem("painel-cargas-auth");}catch(_){} location.reload();}};
     }

@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as XLSX from "npm:xlsx@0.18.5";
 
-// Painel de Cargas · e-mails automáticos (resumo diário e relatório semanal de uso)
+// Painel de Cargas · e-mails automáticos (resumo diário, relatório semanal de uso, relatório mensal e alertas imediatos) · v7
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-key",
@@ -299,6 +299,132 @@ function emailPaletes(p: any, dia: string) {
   return { html, assunto, teams, titulo: p.nivel === "limite" ? "⚠ Limite de paletes PBR atingido" : "Saldo de paletes PBR perto do limite", cor: p.nivel === "limite" ? "Attention" : "Warning" };
 }
 
+
+// ---------- v7: quem recebe alertas (permissão "alertas" + e-mails extras) ----------
+const PERM_PADRAO: Record<string, Record<string, boolean>> = {
+  admin: { alertas: true }, operador: { alertas: true }, leitura: { alertas: false },
+};
+// deno-lint-ignore no-explicit-any
+async function destinosAlertas(db: any, cfg: Record<string, any>) {
+  const a = cfg.alertas ?? {};
+  const [{ data: pf }, { data: mt }] = await Promise.all([
+    db.from("perfis").select("id,perfil,bloqueado,permissoes"),
+    db.from("cargas_config").select("valor").eq("chave", "permissoes").maybeSingle(),
+  ]);
+  const matriz = (mt?.valor ?? {}) as Record<string, Record<string, boolean>>;
+  // deno-lint-ignore no-explicit-any
+  const ids = (pf ?? []).filter((p: any) => !p.bloqueado && (p.perfil === "master" ||
+    (p.perfil === "personalizado" ? !!p.permissoes?.alertas : !!({ ...(PERM_PADRAO[p.perfil] ?? {}), ...(matriz[p.perfil] ?? {}) }).alertas)))
+    // deno-lint-ignore no-explicit-any
+    .map((p: any) => p.id as string);
+  const mails: string[] = [];
+  for (const id of ids.slice(0, 30)) {
+    const { data } = await db.auth.admin.getUserById(id);
+    const e = data?.user?.email ?? ""; if (e && !e.endsWith("@painel.local")) mails.push(e);
+  }
+  return validos([...mails, ...(Array.isArray(a.extras) ? a.extras : [])]);
+}
+
+// ---------- v7: marcos do histórico (mesma regra do painel) ----------
+type H = { tipo?: string; de?: number | null; para?: number; em?: string; reg?: string };
+function marcos(hist: H[]) {
+  const m: Record<number, string> = {}; let entrada: string | null = null;
+  (Array.isArray(hist) ? hist : []).filter((h) => h && h.tipo === "status" && h.de != null && h.em)
+    .sort((a, b) => (a.em! + (a.reg ?? "")).localeCompare(b.em! + (b.reg ?? "")))
+    .forEach((h) => { if (m[h.para!] == null) m[h.para!] = h.em!; if (entrada == null && h.de === 1 && h.para! >= 2 && h.para! <= 6) entrada = h.em!; });
+  return { m, entrada: entrada as string | null };
+}
+const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const nomeMes = (k: string) => { const [y, m] = k.split("-").map(Number); return `${MESES[m - 1]} de ${y}`; };
+const pctTxt = (a: number, n: number) => n ? Math.round(a / n * 100) + "%" : "sem dados";
+
+// ---------- v7: relatório mensal ----------
+// deno-lint-ignore no-explicit-any
+async function montarMensal(db: any, mes: string) {
+  const [y, mm] = mes.split("-").map(Number);
+  const ini = `${mes}-01`, fim = isoOf(Date.UTC(y, mm, 1) / 864e5 - 1);
+  const [{ data: cargas, error }, { data: cfgRows }, { data: ocs }] = await Promise.all([
+    db.from("cargas").select("id,carga,envio,galpao,loja,agenda,status,volume,hist,motivo_atraso").gte("agenda", ini).lte("agenda", fim),
+    db.from("cargas_config").select("chave,valor").eq("chave", "geral"),
+    db.from("ocorrencias").select("carga,tipo,dia").gte("dia", ini).lte("dia", fim),
+  ]);
+  if (error) throw error;
+  const g = (cfgRows?.[0]?.valor ?? {}) as { regraDias?: number; rfDias?: number; feriadosExtras?: string[]; regraTerca?: boolean };
+  const regra = Number(g.regraDias ?? 3), rfd = Number(g.rfDias ?? 1), terca = g.regraTerca !== false, cal = calendario(g.feriadosExtras ?? []);
+  const comOc = new Set((ocs ?? []).map((o: { carga: string }) => String(o.carga)));
+  // deno-lint-ignore no-explicit-any
+  const l = (cargas ?? []).filter((c: any) => c.status !== 0);
+  let otOk = 0, otN = 0, enOk = 0, enN = 0, crOk = 0, crN = 0, vol = 0; const mot = new Map<string, number>(); const porG = new Map<string, { n: number; ok: number }>();
+  // deno-lint-ignore no-explicit-any
+  l.forEach((c: any) => {
+    vol += Number(c.volume ?? 0); const ag = dayOf(c.agenda)!; const { m, entrada } = marcos(c.hist);
+    if (entrada) { crN++; if (dayOf(entrada)! <= prazos(ag, regra, rfd, terca, cal).lim) crOk++; }
+    if (m[6]) { enN++; if (dayOf(m[6])! <= ag) enOk++; }
+    if (c.status === 6 && m[5]) { otN++; const ok = dayOf(m[5])! <= ag - 1 && !comOc.has(String(c.carga)); if (ok) otOk++;
+      const k = c.galpao || "Sem galpão"; const x = porG.get(k) ?? { n: 0, ok: 0 }; x.n++; if (ok) x.ok++; porG.set(k, x); }
+    const mv = c.motivo_atraso?.motivo; if (mv) mot.set(mv, (mot.get(mv) ?? 0) + 1);
+  });
+  const ent = l.filter((c: { status: number }) => c.status === 6).length, can = (cargas ?? []).length - l.length;
+  const motL = [...mot.entries()].sort((a, b) => b[1] - a[1]);
+  const html = `<div style="font-family:Arial,sans-serif;color:#17212b;max-width:720px">
+  <h2 style="margin:0 0 2px">Relatório mensal · ${nomeMes(mes)}</h2>
+  <p style="margin:0 0 14px;color:#5d6b78">Painel de Cargas – Envios Mercado Livre · cargas com agenda no mês</p>
+  <table cellspacing="6" style="width:100%"><tr>
+    ${kpi("OTIF de expedição", pctTxt(otOk, otN), otN && otOk / otN < 0.9 ? "#c62828" : "#17212b")}
+    ${kpi("Entrega na agenda", pctTxt(enOk, enN))}
+    ${kpi("Cronograma no prazo", pctTxt(crOk, crN))}
+    ${kpi("Cargas", String(l.length))}
+  </tr></table>
+  <p style="font-size:14px">${ent} entregues, ${l.length - ent} em aberto, ${can} canceladas · ${vol.toLocaleString("pt-BR")} paletes · ${(ocs ?? []).length} ocorrências registradas no mês.</p>
+  <p style="font-size:13px;color:#5d6b78">OTIF de expedição: das ${otN} cargas entregues com data de expedição, ${otOk} saíram até a véspera da agenda e não tiveram ocorrência.</p>
+  ${secao("OTIF por galpão", porG.size)}${tabela(["Galpão", "Entregues", "No prazo e sem ocorrência", "OTIF"], [...porG.entries()].map(([k, x]) => [k, String(x.n), String(x.ok), pctTxt(x.ok, x.n)]))}
+  ${secao("Motivos de atraso", motL.reduce((a, x) => a + x[1], 0))}${tabela(["Motivo", "Cargas"], motL.map(([k, n]) => [k, String(n)]))}
+  ${botao("Abrir os Indicadores")}
+  <p style="color:#5d6b78;font-size:12px">E-mail automático do dia 1. O Administrador Master muda quem recebe em Indicadores → Ver relatório do mês.</p>
+</div>`;
+  return { html, assunto: `Relatório de cargas · ${nomeMes(mes)} · OTIF ${pctTxt(otOk, otN)} · entrega na agenda ${pctTxt(enOk, enN)}` };
+}
+
+// ---------- v7: cargas atrasadas ainda não avisadas ----------
+// deno-lint-ignore no-explicit-any
+async function atrasadasNovas(db: any, dia: string) {
+  const { data, error } = await db.from("cargas").select("id,carga,envio,galpao,loja,agenda,status,volume,motivo_atraso").is("arquivado_em", null).gte("status", 1).lte("status", 4).not("agenda", "is", null);
+  if (error) throw error;
+  const hoje = dayOf(dia)!;
+  // deno-lint-ignore no-explicit-any
+  const atr = (data ?? []).filter((c: any) => { const ag = dayOf(c.agenda)!; return (c.status > 1 && hoje > ag - 1) || (c.status === 1 && hoje > ag); })
+    // deno-lint-ignore no-explicit-any
+    .map((c: any) => ({ ...c, chave: `${c.id}:${c.agenda}`, tipoAtraso: c.status > 1 ? "Expedição atrasada" : "Entrega atrasada" }));
+  if (!atr.length) return [];
+  // deno-lint-ignore no-explicit-any
+  const { data: ja } = await db.from("alertas_enviados").select("chave").eq("tipo", "atrasada").in("chave", atr.map((c: any) => c.chave));
+  const s = new Set((ja ?? []).map((x: { chave: string }) => x.chave));
+  // deno-lint-ignore no-explicit-any
+  return atr.filter((c: any) => !s.has(c.chave));
+}
+// deno-lint-ignore no-explicit-any
+function emailAtrasadas(l: any[], dia: string) {
+  const html = `<div style="font-family:Arial,sans-serif;color:#17212b;max-width:680px">
+  <h2 style="margin:0 0 6px;color:#c62828">${l.length === 1 ? "1 carga ficou atrasada" : l.length + " cargas ficaram atrasadas"}</h2>
+  <p style="margin:0 0 14px;color:#5d6b78">Painel de Cargas · ${brA(dia)}</p>
+  ${tabela(["Carga", "Envio", "Galpão", "Agenda", "Status", "Situação"], l.map((c) => [c.carga, c.envio || "—", c.galpao || "—", br(c.agenda), ST[c.status] ?? "", c.tipoAtraso]))}
+  <p style="font-size:14px">Abra a carga no painel, reagende no portal se precisar e informe o <b>motivo do atraso</b>.</p>
+  ${botao("Abrir as atrasadas")}
+  <p style="color:#5d6b78;font-size:12px">Alerta automático, um aviso por carga. O Administrador Master configura em Ocorrências → Configurar alertas.</p></div>`;
+  return { html, assunto: `Atenção · ${l.length === 1 ? "carga " + l[0].carga + " atrasada" : l.length + " cargas atrasadas"}` };
+}
+// deno-lint-ignore no-explicit-any
+function emailOcorrencia(o: any) {
+  const html = `<div style="font-family:Arial,sans-serif;color:#17212b;max-width:640px">
+  <h2 style="margin:0 0 6px;color:#c28a0c">Nova ocorrência: ${esc(o.tipo)}</h2>
+  <p style="margin:0 0 14px;color:#5d6b78">Painel de Cargas · registrada por ${esc(o.aberta_por_nome || "—")} em ${brA(String(o.dia || o.criado_em || ""))}</p>
+  ${tabela(["Carga", "Envio", "Tipo", "Dia"], [[o.carga || "—", o.envio || "—", o.tipo, br(o.dia)]])}
+  ${o.descricao ? `<p style="font-size:14px;white-space:pre-wrap">${esc(o.descricao)}</p>` : ""}
+  ${botao("Abrir as ocorrências")}
+  <p style="color:#5d6b78;font-size:12px">Alerta automático. O Administrador Master configura em Ocorrências → Configurar alertas.</p></div>`;
+  return { html, assunto: `Ocorrência · ${o.tipo}${o.carga ? " · carga " + o.carga : ""}` };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return j({ erro: "Método inválido" }, 405);
@@ -315,8 +441,8 @@ Deno.serve(async (req) => {
     const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
     const { data: quem } = await db.auth.getUser(token);
     if (!quem?.user) return null;
-    const { data: p } = await db.from("perfis").select("perfil").eq("id", quem.user.id).maybeSingle();
-    return p?.perfil === "master" ? quem.user : null;
+    const { data: p } = await db.from("perfis").select("perfil,bloqueado").eq("id", quem.user.id).maybeSingle();
+    return p?.perfil === "master" && !p?.bloqueado ? quem.user : null;
   };
   try {
     const acao = String(body.acao ?? "");
@@ -354,6 +480,54 @@ Deno.serve(async (req) => {
       }
       await marcar(acao + "_ultimo", dia);
       return j({ ok: true, enviado: true, para: destinos.length });
+    }
+    if (acao === "mensal" || acao === "alertas" || acao === "alerta_ocorrencia") {
+      const chave = await seg("cron_key");
+      if (!chave || req.headers.get("x-cron-key") !== chave) return j({ erro: "Não autorizado" }, 401);
+      if (acao === "mensal") {
+        const mes = /^\d{4}-\d{2}$/.test(String(body.mes ?? "")) ? String(body.mes) : (() => { const [y, m] = dia.split("-").map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${pad(m - 1)}`; })();
+        if ((await seg("mensal_ultimo")) === mes) return j({ ok: true, enviado: false, motivo: "já enviado" });
+        const destinos = validos(cfg.mensal?.destinatarios);
+        if (cfg.mensal?.ativo && destinos.length) { const r = await montarMensal(db, mes); await enviar(destinos, r.assunto, r.html); }
+        await marcar("mensal_ultimo", mes);
+        return j({ ok: true, enviado: !!(cfg.mensal?.ativo && destinos.length), para: destinos.length });
+      }
+      const al = cfg.alertas ?? {};
+      if (!al.ativo) return j({ ok: true, enviado: false, motivo: "alertas desligados" });
+      const destinos = await destinosAlertas(db, cfg);
+      if (acao === "alertas") {
+        if (al.atrasada === false) return j({ ok: true, enviado: false });
+        const l = await atrasadasNovas(db, dia);
+        if (!l.length) return j({ ok: true, enviado: false, motivo: "nenhuma nova" });
+        if (destinos.length) { const m = emailAtrasadas(l, dia); await enviar(destinos, m.assunto, m.html); }
+        // deno-lint-ignore no-explicit-any
+        await db.from("alertas_enviados").upsert(l.map((c: any) => ({ tipo: "atrasada", chave: c.chave, carga: c.carga, envio: c.envio ?? "", para: destinos })), { onConflict: "tipo,chave", ignoreDuplicates: true });
+        return j({ ok: true, enviado: destinos.length > 0, cargas: l.length });
+      }
+      if (al.ocorrencia === false) return j({ ok: true, enviado: false });
+      const id = String(body.id ?? "");
+      const { data: o } = await db.from("ocorrencias").select("*").eq("id", id).maybeSingle();
+      if (!o) return j({ erro: "Ocorrência não encontrada" }, 404);
+      const { error: dup } = await db.from("alertas_enviados").insert({ tipo: "ocorrencia", chave: id, carga: o.carga ?? "", envio: o.envio ?? "", para: destinos });
+      if (dup) return j({ ok: true, enviado: false, motivo: "já avisado" });
+      if (destinos.length) { const m = emailOcorrencia(o); await enviar(destinos, m.assunto, m.html); }
+      return j({ ok: true, enviado: destinos.length > 0 });
+    }
+    if (acao === "teste" && (body.tipo === "mensal" || body.tipo === "alertas")) {
+      const quem = await souMaster();
+      if (!quem) return j({ erro: "Só o Administrador Master pode enviar o teste." }, 403);
+      if (!quem.email) return j({ erro: "Sua conta não tem e-mail cadastrado." }, 400);
+      const destinos = [quem.email];
+      if (body.tipo === "mensal") {
+        const mes = /^\d{4}-\d{2}$/.test(String(body.mes ?? "")) ? String(body.mes) : dia.slice(0, 7);
+        const r = await montarMensal(db, mes); await enviar(destinos, "[TESTE] " + r.assunto, r.html);
+      } else {
+        const l = await atrasadasNovas(db, dia).catch(() => []);
+        const m = l.length ? emailAtrasadas(l, dia) : emailOcorrencia({ tipo: "Exemplo de ocorrência", carga: "12345678", envio: "82000000", dia, aberta_por_nome: "Teste", descricao: "Este é um e-mail de teste dos alertas." });
+        await enviar(destinos, "[TESTE] " + m.assunto, m.html);
+        await db.from("alertas_enviados").insert({ tipo: "teste", chave: crypto.randomUUID(), para: destinos });
+      }
+      return j({ ok: true, para: destinos });
     }
     if (acao === "teste") {
       const quem = await souMaster();

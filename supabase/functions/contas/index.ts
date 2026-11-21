@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-// Painel de Cargas · contas (entrar, criar conta, esqueci a senha, trocar código do time)
+// Painel de Cargas · contas (entrar, criar conta, esqueci a senha, trocar código do time, bloquear e excluir conta)
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -44,6 +44,7 @@ const falhou = (admin: any, chaves: string[]) => admin.from("tentativas").insert
 // deno-lint-ignore no-explicit-any
 const limpar = (admin: any, chaves: string[]) => admin.from("tentativas").delete().in("chave", chaves);
 const MSG_BLOQ = "Muitas tentativas erradas. Por segurança, espere 15 minutos e tente de novo.";
+const MSG_CONTA_BLOQ = "Seu acesso está bloqueado. Fale com o Administrador Master.";
 const ipDe = (req: Request) => (req.headers.get("x-forwarded-for") ?? req.headers.get("cf-connecting-ip") ?? "").split(",")[0].trim() || "sem-ip";
 
 Deno.serve(async (req) => {
@@ -56,18 +57,49 @@ Deno.serve(async (req) => {
   const ip = ipDe(req);
   const admin = createClient(URL_, SERVICE, { auth: { persistSession: false, autoRefreshToken: false } });
   const perfilPorUsuario = async (u: string) =>
-    (await admin.from("perfis").select("id, usuario, perfil").eq("usuario_lower", u.toLowerCase()).maybeSingle()).data;
+    (await admin.from("perfis").select("id, usuario, perfil, bloqueado").eq("usuario_lower", u.toLowerCase()).maybeSingle()).data;
+  // quem está chamando precisa ser o Administrador Master (e não estar bloqueado)
+  const masterQueChama = async () => {
+    const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+    const { data: quem } = await admin.auth.getUser(token);
+    if (!quem?.user) return null;
+    const { data: p } = await admin.from("perfis").select("id, usuario, perfil, bloqueado").eq("id", quem.user.id).maybeSingle();
+    return p && p.perfil === "master" && !p.bloqueado ? p : null;
+  };
 
   // ---------- trocar o código do time (só o Administrador Master) ----------
   if (acao === "alterar_codigo") {
-    const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-    const { data: quem } = await admin.auth.getUser(token);
-    if (!quem?.user) return j({ erro: "Entre com seu usuário primeiro." }, 401);
-    const { data: p } = await admin.from("perfis").select("perfil").eq("id", quem.user.id).maybeSingle();
-    if (!p || p.perfil !== "master") return j({ erro: "Só o Administrador Master pode trocar o código do time." }, 403);
+    const m = await masterQueChama();
+    if (!m) return j({ erro: "Só o Administrador Master pode trocar o código do time." }, 403);
     const novo = normCodigo(body.novo);
     if (novo.length < 4 || novo.length > 40) return j({ erro: "O código precisa ter de 4 a 40 caracteres." }, 400);
     await admin.from("segredos").upsert({ chave: "codigo_time_sha256", valor: await sha256(novo), atualizado_em: new Date().toISOString() });
+    return j({ ok: true });
+  }
+
+  // ---------- bloquear / desbloquear e excluir conta (só o Administrador Master) ----------
+  if (acao === "bloquear" || acao === "excluir") {
+    const m = await masterQueChama();
+    if (!m) return j({ erro: "Só o Administrador Master pode fazer isso." }, 403);
+    const alvoId = String(body.alvo ?? "");
+    if (alvoId === m.id) return j({ erro: "Você não pode bloquear ou excluir a sua própria conta." }, 400);
+    const { data: alvo } = await admin.from("perfis").select("id, usuario, perfil").eq("id", alvoId).maybeSingle();
+    if (!alvo) return j({ erro: "Conta não encontrada." }, 404);
+    if (alvo.perfil === "master") return j({ erro: "A conta do Administrador Master não pode ser bloqueada nem excluída." }, 400);
+    const registrar = (acaoTxt: string) => admin.from("historico").insert({ por: m.id, por_nome: m.usuario, alvo: "perfil", chave: alvo.usuario, acao: acaoTxt, mudancas: [] });
+    if (acao === "bloquear") {
+      const valor = !!body.valor;
+      const { error } = await admin.from("perfis").update({ bloqueado: valor }).eq("id", alvo.id);
+      if (error) return j({ erro: "Não foi possível salvar: " + error.message }, 500);
+      // bloqueia também no login do Supabase: a sessão aberta não renova e a pessoa não entra de novo
+      await admin.auth.admin.updateUserById(alvo.id, { ban_duration: valor ? "876000h" : "none" });
+      await registrar(valor ? "bloqueou o acesso" : "desbloqueou o acesso");
+      return j({ ok: true });
+    }
+    await admin.from("contas_excluidas").upsert({ id: alvo.id, usuario: alvo.usuario, excluido_por: m.id });
+    const { error } = await admin.auth.admin.deleteUser(alvo.id); // apaga também o perfil (cascata)
+    if (error) return j({ erro: "Não foi possível excluir: " + error.message }, 500);
+    await registrar("excluiu a conta");
     return j({ ok: true });
   }
 
@@ -83,7 +115,7 @@ Deno.serve(async (req) => {
     if (await bloqueado(admin, kRec)) return j({ erro: "Muitos pedidos de nova senha. Espere 15 minutos e tente de novo." }, 429);
     await falhou(admin, kRec);
     const p = await perfilPorUsuario(usuario);
-    if (!p) return j(generico);
+    if (!p || p.bloqueado) return j(generico);
     const { data: u } = await admin.auth.admin.getUserById(p.id);
     const email = u?.user?.email;
     if (!email) return j(generico);
@@ -95,7 +127,7 @@ Deno.serve(async (req) => {
       <h2 style="margin:0 0 12px">Painel de Cargas – Canais Digitais</h2>
       <p>Olá, <b>${escHtml(p.usuario)}</b>.</p>
       <p>Recebemos um pedido para criar uma nova senha para a sua conta.</p>
-      <p style="margin:22px 0"><a href="${url}" style="background:#1d5fa8;color:#fff;text-decoration:none;padding:12px 18px;border-radius:6px;font-weight:bold">Criar nova senha</a></p>
+      <p style="margin:22px 0"><a href="${url}" style="background:#0f1c42;color:#fff;text-decoration:none;padding:12px 18px;border-radius:6px;font-weight:bold">Criar nova senha</a></p>
       <p style="color:#5d6b78;font-size:13px">O link vale por 1 hora e só pode ser usado uma vez. Se você não pediu, ignore este e-mail: sua senha continua a mesma.</p>
     </div>`;
     const r = await fetch("https://api.brevo.com/v3/smtp/email", {
@@ -164,6 +196,8 @@ Deno.serve(async (req) => {
   if (!u?.user?.email) return j({ erro: "Usuário ou senha incorretos." }, 401);
   const pub = createClient(URL_, ANON, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: s, error: e3 } = await pub.auth.signInWithPassword({ email: u.user.email, password: senha });
+  // conta bloqueada: o Supabase recusa o login ("banned"); só avisa do bloqueio, sem confirmar a senha para estranhos
+  if (perfil.bloqueado && (!e3 || /ban/i.test(String(e3.message ?? "")))) return j({ erro: MSG_CONTA_BLOQ }, 403);
   if (e3 || !s?.session) { await falhou(admin, kLog); return j({ erro: "Usuário ou senha incorretos." }, 401); }
   await limpar(admin, ["login:" + usuario.toLowerCase()]);
   return j({ access_token: s.session.access_token, refresh_token: s.session.refresh_token, usuario: perfil.usuario, perfil: perfil.perfil });
