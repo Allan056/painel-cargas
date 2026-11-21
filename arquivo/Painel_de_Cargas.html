@@ -1296,6 +1296,21 @@ fieldset.fset[disabled]::before{content:"Seu perfil não permite mudar esta part
 .pest,.permt{min-width:680px!important}
 .pest select{max-width:190px}
 
+
+/* v19: menu no estilo do WMS (+ / −), cartões por envio, totais do envio */
+.gtit{justify-content:flex-start!important;gap:10px}
+.gsin{position:relative;width:12px;height:12px;flex:none}
+.gsin::before,.gsin::after{content:"";position:absolute;left:0;top:5px;width:12px;height:2px;border-radius:1px;background:currentColor}
+.gsin::after{transform:rotate(90deg);transition:transform .2s var(--ease-out)}
+.gtit[aria-expanded="true"] .gsin::after{transform:rotate(0deg)}
+.menu .grupo ul{margin:2px 0 8px 15px;padding-left:12px;border-left:1px solid color-mix(in srgb,var(--barra-fg) 18%,transparent)}
+.menu .grupo ul a{padding-left:14px}
+.envc ul.ec li,.envc .ec li{display:flex!important;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.envc .ec li .k{min-width:0;flex:1 1 150px;overflow-wrap:anywhere}
+.envtot{font-size:13px;font-weight:600;color:var(--fg)}
+.agenv{display:grid;gap:4px;margin-top:6px}.agenv+.agenv{margin-top:12px}
+.agenvh{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;padding:6px 10px;border-radius:8px;background:var(--surface-2,var(--bg));font-size:14px}
+@media (prefers-reduced-motion:reduce){.gsin::after{transition:none}}
 /* bloco 3: motivo do atraso, comentários, OTIF, modo TV */
 .agform{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px 14px;align-items:end}.agform label{display:grid;gap:4px;font-size:13px;font-weight:600}.agform .small{grid-column:1/-1;min-height:1.2em}
 .agprazo{display:flex;flex-wrap:wrap;gap:6px 18px;padding:10px 12px;border-radius:10px;background:var(--surface-2,var(--bg));border:1px solid var(--line);font-size:14px}.agprazo.atras{border-color:var(--crit)}.agprazo .err{flex-basis:100%}
@@ -1644,7 +1659,7 @@ function render(){
     .concat([["Ajuda",[["ajuda","Ajuda e tour"]]]]);
   const menuHtml=`<aside class="menu" id="menu" aria-label="Menu" ${menuAberto?"":"inert"}>
       <div class="menu-loja">${lojaF?"Loja "+esc(lojaF):"Todas as lojas"} <span>· CD 915 Cajamar</span></div>
-      ${MENU.map(([g,itens])=>{const fech=gruposFechados.has(g);return `<div class="grupo"><button class="gtit" data-grupo="${esc(g)}" aria-expanded="${!fech}">${g}<span class="chev" aria-hidden="true"></span></button>
+      ${MENU.map(([g,itens])=>{const fech=gruposFechados.has(g);return `<div class="grupo"><button class="gtit" data-grupo="${esc(g)}" aria-expanded="${!fech}"><span class="gsin" aria-hidden="true"></span>${g}</button>
         ${fech?"":`<ul>${itens.map(([id,n,x])=>`<li><a href="#${id}" data-ir="${id}" ${v===id?'aria-current="page"':""}>${n}${x||""}</a></li>`).join("")}</ul>`}</div>`;}).join("")}
     </aside>`;
   const iniciais=online?online.nome.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase():"";
@@ -1675,7 +1690,7 @@ function render(){
       ${modoLocal&&sujo&&docs.size?`<div class="notice"><b>Há mudanças feitas no painel que ainda não estão na planilha.</b> Clique em <b>Baixar base</b> e salve o arquivo na pasta da equipe para que todos vejam.</div>`:""}
       ${modoLocal&&!armazenamentoOk?`<div class="notice err">Este navegador não deixou guardar os dados. O painel funciona, mas ao fechar a página você precisa carregar a base de novo.</div>`:""}
       ${retrato?`<div class="notice">Retrato do painel gerado em <b>${dtHora(retrato.geradoEm)}</b>${retrato.porNome?" por <b>"+esc(retrato.porNome)+"</b>":""}. Somente leitura: os dados não se atualizam.</div>`:""}
-      ${pal&&pal.nivel?`<div class="notice palalerta ${pal.nivel}" role="status"><b>${pal.nivel==="limite"?"Limite de paletes PBR atingido":"Saldo de paletes PBR perto do limite"}: ${pal.saldo} de ${pal.limite}.</b> ${pal.nivel==="limite"?"Hora de pedir o retorno dos PBR ao Mercado Livre.":"Faltam "+Math.max(0,pal.limite-pal.saldo)+" PBR para o limite."} ${v!=="paletes"&&online&&online.master?`<a class="lnk" href="#paletes">Ver paletes</a>`:""}</div>`:""}
+      ${pal&&pal.nivel&&v==="paletes"?`<div class="notice palalerta ${pal.nivel}" role="status"><b>${pal.nivel==="limite"?"Limite de paletes PBR atingido":"Saldo de paletes PBR perto do limite"}: ${pal.saldo} de ${pal.limite}.</b> ${pal.nivel==="limite"?"Hora de pedir o retorno dos PBR ao Mercado Livre.":"Faltam "+Math.max(0,pal.limite-pal.saldo)+" PBR para o limite."} ${v!=="paletes"&&online&&online.master?`<a class="lnk" href="#paletes">Ver paletes</a>`:""}</div>`:""}
       ${toast?`<div class="notice ${toastErr?"err":""}" role="status">${esc(toast)}</div>`:""}
       ${loadErr?`<div class="notice err">${esc(loadErr)}</div>`:slow&&!loaded?`<div class="notice">Os dados estão demorando para chegar. Verifique sua conexão; a página continua tentando.</div>`:""}
       ${busca.trim()&&dados?`<div class="notice busc">Busca <b>“${esc(busca.trim())}”</b>: ${pl(rows.length,"carga encontrada","cargas encontradas")}. <button class="lnk" id="limpabusca">Limpar busca</button></div>`:""}
@@ -1868,6 +1883,10 @@ function cardCarga(r){
     ${canWrite&&c>=1&&c<=5?`<div class="r3">${c===1&&r.agenda&&!r.rfInfo?`<button class="adv rfb" data-rf1="${esc(r.id)}" title="Marcar que o R.F. já foi informado">Marcar R.F.</button>`:""}<button class="adv" data-adv="${esc(r.id)}" title="Registrar avanço com a data de hoje">→ ${ST[c+1].nome}</button></div>`:""}
   </article>`;
 }
+/* totais de um envio (1 ou mais cargas): paletes, unidades e, quando informados, PBR e CHEP */
+function envTot(l){const v=l.filter(r=>r.cod!==0);const s=k=>v.reduce((t,r)=>t+(typeof r[k]==="number"?r[k]:0),0);
+  const pal=s("volume"), un=v.reduce((t,r)=>t+(r.unid||0),0), temUn=v.some(r=>r.unid!=null), pbr=s("pbr"), chep=s("chep"), temPc=v.some(r=>r.pbr!=null||r.chep!=null);
+  return `${pl(v.length,"carga","cargas")} · ${fmtN(pal)} ${pal===1?"palete":"paletes"}${temUn?` · ${fmtN(un)} unidades`:""}${temPc?` · ${fmtN(pbr)} PBR · ${fmtN(chep)} CHEP`:""}`;}
 function cardEnvio(x){
   const allSel=x.a.every(r=>sel.has(r.id)), some=x.a.some(r=>sel.has(r.id));
   const ags=[...new Set(x.a.map(r=>r.agenda).filter(Boolean))].sort();
@@ -1878,7 +1897,7 @@ function cardEnvio(x){
     <div class="r1"><label class="ck"><input type="checkbox" data-selenv="${esc(x.e)}" ${allSel?"checked":""} ${some&&!allSel?'data-ind="1"':""} aria-label="Selecionar envio"><span class="mono" style="font-size:17px;font-weight:600">${esc(x.e)}</span></label><span class="k" style="font-size:12px">${pl(x.l.length,"carga")}</span></div>
     <div class="envp"><div class="envbar"><i style="width:${pct}%"></i></div><span>${expd?"envio expedido":`${prod} de ${vivas.length} produzida${vivas.length===1?"":"s"}`}</span></div>
     ${pronto?`<div class="envok">Pronto para expedir${canWrite?` <button class="adv" data-expenv="${esc(x.e)}" title="Marcar todas as cargas do envio como Expedida (hoje)">→ Expedir envio</button>`:""}</div>`:""}
-    <div class="env">Agenda ${ags.map(a=>br(a)+" "+wdS(a)).join(", ")||"—"}${sumVol(x.l)}</div>
+    <div class="env">Agenda ${ags.map(a=>br(a)+" "+wdS(a)).join(", ")||"—"}</div><div class="envtot">${envTot(x.l)}</div>
     <ul class="ec">${x.l.map(r=>`<li class="${aberta(r)?"":"closed"}" style="${cv(r.cod)}"><span class="dot"></span>${cgBtn(r)}<span class="k">${ST[r.cod].nome}${r.galpao?" · "+esc(r.galpao):""}</span></li>`).join("")}</ul></article>`;
 }
 function vPainel(modo){
@@ -1920,7 +1939,7 @@ function vPainel(modo){
       <div class="r1"><label class="ck"><input type="checkbox" data-selenv="${esc(x.e)}" ${allSel?"checked":""} ${some&&!allSel?'data-ind="1"':""} aria-label="Selecionar envio"><span class="mono" style="font-size:17px;font-weight:600">${esc(x.e)}</span></label><span class="k" style="font-size:12px">${pl(x.l.length,"carga")}</span></div>
       <div class="envp"><div class="envbar"><i style="width:${pct}%"></i></div><span>${expd?"envio expedido":`${prod} de ${vivas.length} produzida${vivas.length===1?"":"s"}`}</span></div>
       ${pronto?`<div class="envok">Envio pronto para expedir${canWrite?` <button class="adv" data-expenv="${esc(x.e)}" title="Marcar todas as cargas do envio como Expedida (hoje)">→ Expedir envio</button>`:""}</div>`:""}
-      <div class="env">Agenda ${ags.map(a=>br(a)+" "+wdS(a)).join(", ")||"—"}${(()=>{const ls=[...new Set(x.l.map(r=>r.loja).filter(Boolean))];return ls.length?" · Loja "+ls.map(esc).join(", "):"";})()}${sumVol(x.l)}</div>
+      <div class="env">Agenda ${ags.map(a=>br(a)+" "+wdS(a)).join(", ")||"—"}${(()=>{const ls=[...new Set(x.l.map(r=>r.loja).filter(Boolean))];return ls.length?" · Loja "+ls.map(esc).join(", "):"";})()}</div><div class="envtot">${envTot(x.l)}</div>
       <ul class="ec">${x.l.map(r=>`<li class="${aberta(r)?"":"closed"}" style="${cv(r.cod)}"><span class="dot"></span>${cgBtn(r)}<span class="k">${ST[r.cod].nome}${r.galpao?" · "+esc(r.galpao):""}</span></li>`).join("")}</ul></div>`;}).join("");
   const envOp=colsAbertas.has("env");
   const nPronto=envios.filter(x=>{const v=x.l.filter(r=>r.cod!==0);return v.length>0&&v.every(r=>r.cod===4);}).length;
@@ -1990,7 +2009,7 @@ function vResumo(pal){
     .sort((a,b)=>(a.d||"9999").localeCompare(b.d||"9999")).slice(0,8);
   const envHtml=envs.map(x=>{const at=x.d&&x.d<hj, hoje=x.d===hj;
     return `<article class="envc ${at?"at":""}"><header><div><h3>${x.e==="sem envio"?"Sem envio":"Envio "+esc(x.e)}</h3><p class="small">${x.d?`Expedição <b>${br(x.d)}</b> ${wdS(x.d)}`:"sem data"}${x.ag?` · Agenda <b>${br(x.ag)}</b>`:""}</p></div>${at?`<span class="etag crit">atrasado</span>`:hoje?`<span class="etag dest">hoje</span>`:""}</header>
-      <p class="etot">${pl(x.l.length,"carga")} · ${plt(x.l)} · ${fmtN(sPbr(x.l))} PBR · ${fmtN(sChep(x.l))} CHEP</p>
+      <p class="etot">${x.e==="sem envio"?`${pl(x.l.length,"carga")} · ${plt(x.l)}`:envTot(allRows.filter(r=>r.envio===x.e))}</p>
       <ul>${x.l.map(r=>`<li style="${cv(r.cod)}">${cgBtn(r)}<span class="small">${r.galpao?esc(r.galpao):"—"}</span><span class="pill">${ST[r.cod].nome}</span><span class="epal">${r.volume!=null?fmtN(r.volume):"—"}</span></li>`).join("")}</ul></article>`;}).join("");
   return `<div class="in resumo"><div class="rcards">${cards.join("")}</div>
     <section class="rsec"><div class="rsh"><h2>Próximos envios a expedir</h2><span class="small">por data de expedição · cargas ainda não expedidas</span></div>
@@ -2023,8 +2042,11 @@ function holoQuadro(now){
   const el=document.querySelector(".palco3d"); if(!el){holoRodando=false;return;}
   const t=(now-holoT0)/1000;
   /* com mouse o caminhão acompanha o ponteiro; sem mouse (celular) gira devagar sozinho */
-  const alvoRz=holoMx!=null?-24+(holoMx-.5)*240:-24+t*14, alvoRx=holoMx!=null?63-(holoMy-.5)*18:63+3*Math.sin(t/18*2*Math.PI);
-  holoRz+=(alvoRz-holoRz)*.08; holoRx+=(alvoRx-holoRx)*.08;
+  /* mouse de uma ponta à outra da tela = uma volta completa (360°); com o menu aberto o caminhão fica parado */
+  if(!menuAberto){
+    const alvoRz=holoMx!=null?-24+(holoMx-.5)*360:-24+t*14, alvoRx=holoMx!=null?63-(holoMy-.5)*18:63+3*Math.sin(t/18*2*Math.PI);
+    holoRz+=(alvoRz-holoRz)*.08; holoRx+=(alvoRx-holoRx)*.08;
+  }
   const mu=el.querySelector(".mundo3"); if(mu) mu.style.transform=`rotateX(${holoRx.toFixed(2)}deg) rotateZ(${holoRz.toFixed(2)}deg) scale3d(var(--esc3,.9),var(--esc3,.9),var(--esc3,.9))`;
   requestAnimationFrame(holoQuadro);
 }
@@ -2038,7 +2060,7 @@ function vInicio(lojas,precisaLoja){
       <h1>${saud}${nome?", "+esc(nome):""}.</h1>
       ${precisaLoja?`<p>Escolha a loja no topo da tela para começar.</p>`
         :loaded&&!docs.size?`<p>Nenhuma carga no painel ainda. ${canWrite?"Carregue a planilha base para começar.":"Peça a quem cuida da base para carregar a planilha."}</p>${canWrite?`<button class="btn" id="btnArq2">Carregar base</button>`:""}`
-        :`<p>${lojaF?"Loja "+esc(lojaF)+" · ":""}Abra o menu para escolher uma tela.</p><button class="btn" data-menu="abrir">Abrir o menu</button>`}
+        :lojaF?`<p>Loja ${esc(lojaF)}</p>`:""}
     </div>${palcoHolo()}</div>`;
 }
 /* ---------- cartão de carga (Agendadas e Atrasadas e pendências) ---------- */
@@ -2065,7 +2087,8 @@ function vAgendadas(){
   const semE=rows.filter(r=>aberta(r)&&!r.envio).length;
   return `<div class="in main"><div class="bar"><div class="chips">${chips}</div>${podeAgendar()?`<span class="actions">${semE?`<span class="small">${pl(semE,"carga sem envio","cargas sem envio")}</span>`:""}<button class="btn sm" data-agnovo>Agendar envio</button></span>`:""}</div>
     ${ord.length?ord.map(d=>{const l=dias.get(d).sort((a,b)=>a.envio.localeCompare(b.envio)||a.carga.localeCompare(b.carga));const pal=l.reduce((t,r)=>t+(r.volume||0),0),pbr=l.reduce((t,r)=>t+(r.pbr||0),0);
-      return `<section class="agdia ${d===hoje?"hoje":""}"><header><h2>${wdS(d)} ${br(d)}${d===hoje?' <span class="hojet">hoje</span>':""}</h2><span class="small">${pl(l.length,"carga","cargas")} · ${fmtN(pal)} paletes${pbr?" · "+pbr+" PBR":""}</span></header><ul>${l.map(r=>cargaItem(r,false)).join("")}</ul></section>`;}).join("")
+      return `<section class="agdia ${d===hoje?"hoje":""}"><header><h2>${wdS(d)} ${br(d)}${d===hoje?' <span class="hojet">hoje</span>':""}</h2><span class="small">${pl(l.length,"carga","cargas")} · ${fmtN(pal)} paletes${pbr?" · "+pbr+" PBR":""}</span></header>${(()=>{const ge=new Map();l.forEach(r=>{const k=r.envio||"";if(!ge.has(k))ge.set(k,[]);ge.get(k).push(r);});
+        return [...ge.entries()].map(([e,le])=>`<div class="agenv"><div class="agenvh"><span>${e?`Envio <b class="mono">${esc(e)}</b>`:"Sem envio"}</span><span class="small">${e?envTot(allRows.filter(r=>r.envio===e)):envTot(le)}</span></div><ul>${le.map(r=>cargaItem(r,false)).join("")}</ul></div>`).join("");})()}</section>`;}).join("")
       :`<div class="blank"><h2>Nenhuma carga agendada nesta visão</h2><p class="small" style="margin:0">As cargas aparecem aqui quando têm data de agenda no Mercado Livre.</p></div>`}
   </div>`;
 }
@@ -2315,7 +2338,7 @@ function renderDrawerInfo(){
   box.innerHTML=`<div class="facts">
       <div><span class="label">Status</span><span class="v"><span class="pill" style="${cv(r.cod)}">${ST[r.cod].nome}</span></span></div>
       <div><span class="label">Alerta</span><span class="v alert" style="${av(r)}">${r.alerta}</span></div>
-      <div><span class="label">Envio</span><span class="v mono">${r.envio?esc(r.envio):'<span class="small">sem envio</span>'}</span>${podeAgendar()&&aberta(r)?`<button class="lnk small" data-agenv="${esc(r.envio)}" data-agid="${esc(r.id)}">${r.envio?"Reagendar ou tirar do envio":"Agendar envio"}</button>`:""}</div>
+      <div><span class="label">Envio</span><span class="v mono">${r.envio?esc(r.envio):'<span class="small">sem envio</span>'}</span>${r.envio?`<span class="small">${envTot(allRows.filter(x=>x.envio===r.envio))}</span>`:""}${podeAgendar()&&aberta(r)?`<button class="lnk small" data-agenv="${esc(r.envio)}" data-agid="${esc(r.id)}">${r.envio?"Reagendar ou tirar do envio":"Agendar envio"}</button>`:""}</div>
       <div><span class="label">Galpão</span><span class="v">${esc(r.galpao)||"—"}</span></div>
       <div><span class="label">Loja destino</span><span class="v mono">${esc(r.loja)||"—"}</span></div>
       <div><span class="label">Cronograma até</span><span class="v mono">${brA(r.lim)} ${wdS(r.lim)}${r.cod===1?" · "+prazoTxt(r.duLim):""}</span></div>
